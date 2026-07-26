@@ -1,18 +1,28 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { logger } from '../utils/logger';
 
+/**
+ * 本标签页唯一标识。
+ * Channel 已按 userId 隔离，频道内全部是同一账号的消息，
+ * 「自己 / 其他标签页」必须按标签页身份区分（同账号多标签页正是要拦截的场景），
+ * 不能按 userId 区分。不用 crypto.randomUUID()：http 直连 IP 的生产部署
+ * 属非 secure context，该 API 不可用。
+ */
+const TAB_ID = `tab_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+
 export interface LockMessage {
   type: 'lock' | 'release';
   itemId: string;
+  tabId: string;
   userId: string;
   timestamp: number;
 }
 
 export interface UseCrossTabLockReturn {
-  /** 当前条目是否被其他标签页持有 */
+  /** 是否有其他标签页正持有编辑锁 */
   lockedByOtherTab: ReturnType<typeof ref<boolean>>;
-  /** 锁持有者（用户 ID） */
-  otherTabUserId: ReturnType<typeof ref<string | null>>;
+  /** 被其他标签页锁定的条目 ID（条目粒度，避免误伤其他条目的编辑） */
+  lockedItemId: ReturnType<typeof ref<string | null>>;
   /** 广播加锁消息到其他标签页 */
   broadcastLock: (itemId: string, userId: string) => void;
   /** 广播释放消息到其他标签页 */
@@ -22,17 +32,19 @@ export interface UseCrossTabLockReturn {
 /**
  * BroadcastChannel 跨标签页编辑锁检测。
  *
- * 同一浏览器的多个标签页编辑同一条数据时，服务端悲观锁无法感知——
- * 两个标签页各自持锁，实际上在互相覆盖。
+ * 服务端悲观锁以用户为粒度（lockedBy = username），同一账号在同一浏览器
+ * 开多个标签页编辑同一条数据时，每个标签页 claim 都会成功，实际在互相覆盖。
+ * 通过 BroadcastChannel 广播锁状态补上「标签页粒度」的互斥：
+ * 标签页 B 收到标签页 A 的锁消息后，对该条目禁用编辑并提示。
  *
- * 通过 BroadcastChannel 广播锁状态，标签页 B 收到标签页 A 的锁消息后
- * 提示用户「此数据正在另一标签页编辑中」。
- *
- * Channel 名称按 userId 隔离，不同用户互不干扰。
+ * Channel 名称按 userId 隔离（不同用户间的冲突由服务端悲观锁负责）；
+ * 消息按 TAB_ID 区分本标签页与其他标签页。
+ * 标签页崩溃（不触发 beforeunload）会残留本地锁状态，刷新后消失；
+ * 数据正确性始终由服务端 30 分钟锁超时 + 提交版本校验兜底，本层只是 UX 前置拦截。
  */
 export function useCrossTabLock(userId: string): UseCrossTabLockReturn {
   const lockedByOtherTab = ref(false);
-  const otherTabUserId = ref<string | null>(null);
+  const lockedItemId = ref<string | null>(null);
   let channel: BroadcastChannel | null = null;
   let heldItemId: string | null = null;
   let heldUserId: string | null = null;
@@ -50,58 +62,50 @@ export function useCrossTabLock(userId: string): UseCrossTabLockReturn {
   }
 
   function handleMessage(msg: LockMessage) {
-    if (!msg || msg.userId === userId) return; // 忽略自己的消息
+    if (!msg || msg.tabId === TAB_ID) return; // 只忽略本标签页自己的消息
 
     if (msg.type === 'lock') {
       logger.log('[CrossTab] 其他标签页加锁:', msg.itemId);
       lockedByOtherTab.value = true;
-      otherTabUserId.value = msg.userId;
+      lockedItemId.value = msg.itemId;
     } else if (msg.type === 'release') {
-      logger.log('[CrossTab] 其他标签页释放锁:', msg.itemId);
-      lockedByOtherTab.value = false;
-      otherTabUserId.value = null;
+      // 仅当释放的是当前记录的条目才清除，防止乱序消息误清
+      if (lockedItemId.value === msg.itemId) {
+        logger.log('[CrossTab] 其他标签页释放锁:', msg.itemId);
+        lockedByOtherTab.value = false;
+        lockedItemId.value = null;
+      }
     }
   }
 
-  function broadcastLock(itemId: string, uid: string) {
-    heldItemId = itemId;
-    heldUserId = uid;
+  function post(type: LockMessage['type'], itemId: string, uid: string) {
     const ch = getChannel();
     if (ch) {
       ch.postMessage({
-        type: 'lock',
+        type,
         itemId,
+        tabId: TAB_ID,
         userId: uid,
         timestamp: Date.now(),
       } satisfies LockMessage);
     }
   }
 
+  function broadcastLock(itemId: string, uid: string) {
+    heldItemId = itemId;
+    heldUserId = uid;
+    post('lock', itemId, uid);
+  }
+
   function broadcastRelease(itemId: string) {
     heldItemId = null;
-    const ch = getChannel();
-    if (ch) {
-      ch.postMessage({
-        type: 'release',
-        itemId,
-        userId: userId,
-        timestamp: Date.now(),
-      } satisfies LockMessage);
-    }
+    post('release', itemId, userId);
   }
 
   // 页面关闭/刷新时广播释放当前持有的锁
   function onBeforeUnload() {
     if (heldItemId && heldUserId) {
-      const ch = getChannel();
-      if (ch) {
-        ch.postMessage({
-          type: 'release',
-          itemId: heldItemId,
-          userId: heldUserId,
-          timestamp: Date.now(),
-        } satisfies LockMessage);
-      }
+      post('release', heldItemId, heldUserId);
     }
   }
 
@@ -121,7 +125,7 @@ export function useCrossTabLock(userId: string): UseCrossTabLockReturn {
 
   return {
     lockedByOtherTab,
-    otherTabUserId,
+    lockedItemId,
     broadcastLock,
     broadcastRelease,
   };

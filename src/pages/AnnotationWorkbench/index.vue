@@ -90,6 +90,15 @@
           </template>
         </a-alert>
 
+        <a-alert
+          v-if="isCrossTabLocked"
+          type="warning"
+          show-icon
+          class="page-alert"
+          message="该数据正在本浏览器的另一个标签页中编辑"
+          description="同一账号同时只能在一个标签页编辑同一条数据，请切回原标签页继续，或在原标签页离开该条目后再编辑。"
+        />
+
         <div class="workbench-main">
           <a-card title="原始数据" size="small" class="panel-card raw-panel">
             <pre class="raw-json">{{ prettyRawData }}</pre>
@@ -510,8 +519,17 @@ const isReadOnly = computed(() => {
     status === DataItemStatus.REVIEWED
   );
 });
+// ── 跨标签页锁检测（BroadcastChannel，条目粒度）─────────────
+const crossTab = useCrossTabLock(authStore.user?.id ?? '');
+const isCrossTabLocked = computed(() =>
+  Boolean(currentItem.value && crossTab.lockedItemId.value === currentItem.value.id),
+);
 const isEditable = computed(
-  () => !isReadOnly.value && !annotationStore.conflictInfo && !annotationStore.lockInfo,
+  () =>
+    !isReadOnly.value &&
+    !annotationStore.conflictInfo &&
+    !annotationStore.lockInfo &&
+    !isCrossTabLocked.value,
 );
 const canSaveDraft = computed(
   () => !isReadOnly.value && currentItem.value?.status !== DataItemStatus.REJECTED,
@@ -520,12 +538,6 @@ const canSaveDraft = computed(
 // ── 实时预审引擎（composable）──────────────────────────
 const { liveReviewResult, riskStats, sortedWarnings, fieldValidateStatus, fieldHelp } =
   useLivePreReview({ templateSchema, currentItem, formState });
-
-// ── 跨标签页锁检测（BroadcastChannel）─────────────────────
-const crossTab = useCrossTabLock(authStore.user?.id ?? '');
-const isCrossTabLocked = computed(
-  () => crossTab.lockedByOtherTab.value && crossTab.otherTabUserId.value !== authStore.user?.id,
-);
 
 // ── 悲观编辑锁：进入可编辑条目自动加锁，切换/提交/离开自动释放 ──
 const { acquiring: lockAcquiring, retry: retryAcquireLock } = useEditLock({
