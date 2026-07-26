@@ -1,0 +1,15 @@
+.skeleton-loader {
+  padding: 16px 0;
+}
+
+.skeleton-header {
+  margin-bottom: 24px;
+}
+
+.skeleton-header .ant-skeleton {
+  margin-bottom: 8px;
+}
+
+.skeleton-card {
+  border-radius: 8px;
+}

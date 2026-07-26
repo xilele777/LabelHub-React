@@ -33,11 +33,11 @@
 
 ## 阶段 2：基础设施（2-3 个会话，串行）
 
-- [ ] **2.1 Store 迁移** [M] — 5 个 Pinia store → Zustand。**已完成 2/5**（useAuthStore、useNotificationStore 在阶段 1 预支，含单测改写，因 api/services 层硬依赖）。剩余：useTaskStore、useTemplateStore、useAnnotationStore。验收：对应 store 单测改写为 Zustand 版并通过。
-- [ ] **2.2 Composables → Hooks** [M] — useCrossTabLock、useDebounced、useDraftPersistence、useNetworkStatus、useVirtualList 共 5 个。注意 useCrossTabLock 的生命周期清理语义（onUnmounted → useEffect cleanup）。验收：useDebounced/useDraftPersistence/useVirtualList 单测通过。
-- [ ] **2.3 路由与权限** [M] — 路由表（含 roles 元信息、懒加载、preloadTemplateSchemas 预加载钩子）→ React Router；实现 `<RequireRole>` 守卫，登录态跳转逻辑与 Vue 版一致（getDefaultPath/hasRouteRole 复用 utils）。验收：未登录访问受限页重定向到 /login。
-- [ ] **2.4 通用组件** [S] — ErrorBoundary（React class 组件原生实现）、NetworkStatusBar、SkeletonLoader。验收：Storybook 式手工渲染检查或简单快照。
-- [ ] **2.5 MainLayout + Login 端到端** [L] — MainLayout（1008 行：菜单、面包屑、通知铃铛、WebSocket 集成、用户菜单）+ Login 页。**这是第一个端到端验证点。** 验收：真实登录 → 进入布局 → 按角色显示菜单 → 通知实时推送可见。
+- [x] **2.1 Store 迁移** [M] — 5 个 Pinia store → Zustand。**已完成 5/5**（useAuthStore、useNotificationStore 阶段 1 预支；useTaskStore、useTemplateStore、useAnnotationStore 阶段 2 完成）。验收：对应 store 单测改写为 Zustand 版并通过。
+- [x] **2.2 Composables → Hooks** [M] — useCrossTabLock、useDebounced、useDraftPersistence、useNetworkStatus、useVirtualList 共 5 个。注意 useCrossTabLock 的生命周期清理语义（onUnmounted → useEffect cleanup）。验收：useDebounced/useDraftPersistence/useVirtualList 单测通过。
+- [x] **2.3 路由与权限** [M] — 路由表（含 roles 元信息、懒加载、preloadTemplateSchemas 预加载钩子）→ React Router；实现 `<RequireRole>` 守卫，登录态跳转逻辑与 Vue 版一致（getDefaultPath/hasRouteRole 复用 utils）。验收：未登录访问受限页重定向到 /login。
+- [x] **2.4 通用组件** [S] — ErrorBoundary（React class 组件原生实现）、NetworkStatusBar、SkeletonLoader。验收：Storybook 式手工渲染检查或简单快照。
+- [x] **2.5 MainLayout + Login 端到端** [L] — MainLayout（1008 行：菜单、面包屑、通知铃铛、WebSocket 集成、用户菜单）+ Login 页。**这是第一个端到端验证点。** 验收：真实登录 → 进入布局 → 按角色显示菜单 → 通知实时推送可见。
 
 ## 阶段 3：中小页面批量迁移（页面间独立，可多 agent 并行）
 
@@ -88,6 +88,13 @@
 
 - 2026-07-26 **阶段 0 + 阶段 1 完成**（验收全绿：build 零错误 / lint 零告警 / 测试 44/44 / 零 vue 生态依赖）。要点：
   - **2.1 预支 2/5**：useAuthStore、useNotificationStore 已迁 Zustand。原因：request.ts / notification.ts / notificationWebSocket.ts 硬依赖这两个 store；且 Vue 版 store 外层本就是 Zustand 形状的适配层（getState/setState/selector），直迁比造临时脚手架更省
-  - **三处必要适配**（"原样搬运"之外）：① `AUTH_EXPIRED_EVENT` 抽到 `api/authEvents.ts`——消除 request ⇄ store 循环加载的 TDZ 崩溃风险（Vue 版靠入口先加载 store 侥幸成立，React 版入口顺序相反）；② request.ts 两处 `useAuthStore()` → `useAuthStore.getState()`——Pinia 可在任意处调用，Zustand hook 形态在拦截器（非组件上下文）会抛 Invalid hook call，eslint react-hooks 规则抓到的真 bug；③ exportWorkerClient.ts 删除 `deepToRaw`——其唯一职责是解 Vue 响应式 Proxy，Zustand 普通对象可直接 structured clone
+  - **三处必要适配**（"原样搬运"之外）：① `AUTH_EXPIRED_EVENT` 抽到 `api/authEvents.ts`——消除 request ⇄ store 循环加载的 TDZ 崩溃风险（Vue 版靠入口先加载 store 侥幸成立，React 版入口顺序相反）；② request.ts 两处 `useAuthStore()` → `useAuthStore.getState()`——Pinia 可在任意处调用，Zustand hook 形态在 拦截器（非组件上下文）会抛 Invalid hook call，eslint react-hooks 规则抓到的真 bug；③ exportWorkerClient.ts 删除 `deepToRaw`——其唯一职责是解 Vue 响应式 Proxy，Zustand 普通对象可直接 structured clone
   - **上游发现（Vue 版待决断）**：`useAuthStore.test.ts` 的"token 不落 localStorage"断言与实现矛盾，Vue 版该测试一直是红的（token 实际持久化到 localStorage，WS 重连凭证刷新依赖它）。React 版测试已对齐实际行为；Vue 版要修测试还是改实现（真 httpOnly cookie）留待决定
   - **工具链**：dev 端口默认 3100（与 Vue 版 3000 并行对照）；根 eslint ignores 加了 `frontend-react/**`；frontend-react 有独立 `.lintstagedrc.mjs`（lint-staged 多配置，就近生效）；manualChunks 对象形式只列已引用包，react-router/zustand/socket.io-client 接入后再补
+- 2026-07-26 **阶段 2 完成**（验收全绿：build 零错误 / lint 零告警 / 测试 64/64；冒烟：dev 代理下 /login 页面 200、o//123 与 a//123 登录 API 返回 token）。要点：
+  - **Hook 语义转换**：useDebounced 签名改 `(value, delay)` 直接传值（React 无 ref/getter 概念，注意事项见 JSDoc：依赖 Object.is 比较，须传原始类型）；useDraftPersistence 的 options 改传值+回调，内部用 latest-ref 模式避免 effect 空转；useVirtualList 的 containerRef 改 callback ref（覆盖容器条件渲染延迟出现/销毁重建，等价 Vue watch(containerRef)）
+  - **两处真修正**：① useDraftPersistence 基线标记独立于 lastSnapshot——`clear()` 后下一次表单变化必须仍能保存（Vue 版靠 watch 初始化语义天然成立，照抄 lastSnapshot===null 判首次会静默丢草稿），新增回归测试覆盖；② useNetworkStatus 卸载时必须 `socket.off` 摘监听——socket 是全局单例，Vue 版组件销毁即断连无此问题，React StrictMode 双挂载会叠监听
+  - **守卫结构**：Vue 全局 beforeEach → 组件守卫三件套 RequireAuth（未登录→/login?redirect=）/ RequireRole（→/403）/ RedirectIfAuthed（登录页反跳）；路由 meta.title → handle.title + useMatches；preloadTemplateSchemas 移入 MainLayout 的 auth effect（模块级 flag 保持一次性语义）
+  - **阶段 3 占位**：16 条业务路由的 Component 均为 null → PlaceholderPage；迁移某页时在 router/routes.tsx 把 null 换成 `lazy(() => import(...))` 即可（Suspense fallback=SkeletonLoader 已就位）
+  - **明确不迁/延后**：keep-alive（TaskList/TemplateManage 状态缓存）无 React 原生等价物，阶段 3 用 store 持久化筛选状态替代；page-fade out-in 过渡简化为进入动画（避免引 react-transition-group）
+  - **体积基线**：入口 index chunk 890kB（gzip 284kB，antd 未拆），阶段 5.2 页面懒加载接入后再做分包对齐

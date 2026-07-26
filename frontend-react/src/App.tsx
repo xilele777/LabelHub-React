@@ -1,28 +1,30 @@
-import { Card, ConfigProvider, Descriptions, Tag, Typography } from 'antd';
+import { App as AntdApp, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { buildRequestKey } from '@/api/request';
-import { Role } from '@/types';
+import { RouterProvider } from 'react-router/dom';
+import { router } from './router';
 
-// 阶段 1 自检页：故意引用搬运层（api/types），让 vite build 真实覆盖这些模块。
-// 阶段 2 接入路由后由 MainLayout/Login 替换。
-const sampleKey = buildRequestKey('/tasks', { page: 1, status: 'draft' });
-const roles = Object.values(Role);
+const googleTheme = {
+  token: {
+    colorPrimary: '#1a73e8',
+    colorSuccess: '#188038',
+    colorWarning: '#f9ab00',
+    colorError: '#d93025',
+    colorInfo: '#129eaf',
+    colorText: '#202124',
+    colorTextSecondary: '#5f6368',
+    colorBorder: '#e0e3eb',
+    borderRadius: 8,
+    fontFamily: "Inter, Roboto, 'Google Sans', 'Segoe UI', Arial, sans-serif",
+  },
+};
 
 export default function App() {
   return (
-    <ConfigProvider locale={zhCN}>
-      <Card title="LabelHub React 迁移骨架" style={{ maxWidth: 640, margin: '48px auto' }}>
-        <Descriptions column={1} bordered size="small">
-          <Descriptions.Item label="应用版本">{__APP_VERSION__}</Descriptions.Item>
-          <Descriptions.Item label="api/request 自检">{sampleKey}</Descriptions.Item>
-          <Descriptions.Item label="types/Role 自检">
-            {roles.map((role) => (
-              <Tag key={role}>{role}</Tag>
-            ))}
-          </Descriptions.Item>
-        </Descriptions>
-        <Typography.Text type="secondary">阶段 1 骨架 — 框架无关层已搬运</Typography.Text>
-      </Card>
+    <ConfigProvider locale={zhCN} theme={googleTheme}>
+      {/* antd App 上下文：使 message/modal/notification 静态方法继承主题 */}
+      <AntdApp>
+        <RouterProvider router={router} />
+      </AntdApp>
     </ConfigProvider>
   );
 }
