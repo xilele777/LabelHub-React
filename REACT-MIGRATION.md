@@ -58,13 +58,13 @@
 
 ## 阶段 4：三大工作台攻坚（每个一个专注会话 + 人工验证，串行）
 
-- [ ] **4.1 TemplateBuilder**（1129 行 + PropertyPanel 278 行等子组件）[L]
+- [x] **4.1 TemplateBuilder**（1129 行 + PropertyPanel 278 行等子组件）[L]
   - 难点：vue-draggable-plus → dnd-kit 重写拖拽；表单 schema 双向绑定改受控。
   - 人工验收：拖拽排序/添加/删除控件、属性面板编辑、保存后 schema 与 Vue 版产出一致（可 diff JSON）。
-- [ ] **4.2 AnnotationWorkbench**（1203 行）[XL]
+- [x] **4.2 AnnotationWorkbench**（1203 行）[XL]
   - 难点：视频标注、跨 tab 锁（useCrossTabLock）、草稿持久化（useDraftPersistence）、键盘快捷键。
   - 人工验收：双开 tab 验证锁互斥；断网/刷新草稿恢复；视频帧操作；提交流程完整。
-- [ ] **4.3 ReviewWorkbench**（1129 行）[L]
+- [x] **4.3 ReviewWorkbench**（1129 行）[L]
   - 难点：审核流状态机、aiReviewEngine 集成、批量操作。
   - 人工验收：通过/驳回/批量审核全流程，AI 预审结果展示一致。
 
@@ -107,3 +107,15 @@
   - **MonitoringBoard 首载失败提示**：`fetchSummary` 改为返回错误串（React setState 异步，Vue 版 then 后读 error.value 的写法读不到最新值），仅首次挂载弹 warning，语义与 Vue onMounted 一致。另注：清单原文写"轮询/实时"，Vue 版实际是手动刷新 + 天数切换重拉，React 版照实对齐、未加轮询
   - **样式迁移约定**：Vue scoped → 每页独立 css 文件 + 页面根类作用域前缀（`.task-list-page .search-input`），`:deep(...)` 直接展开为后代选择器；global.css 两工程本就同源无需改动
   - **构建产物**：全部页面懒加载后 index chunk 899kB（gzip 287kB，与阶段 2 基线 890kB 持平，antd 主包未拆），echarts 独立 chunk 554kB（gzip 190kB）仅 /monitoring 按需加载，页面级 chunk 1.1–17kB。5.2 再做 manualChunks 对齐
+- 2026-07-27 **阶段 4 完成**（验收全绿：build 零错误 / lint 零告警 / 测试 64/64；dev 冒烟：三工作台全部 16 个模块经 vite 转换 200）。三大工作台代码迁移完毕，人工验收（拖拽体验、双开 tab 锁互斥、审核全流程）待跑。要点：
+  - **4.1 dnd-kit 拖拽结构**：单 DndContext 包物料区（useDraggable）+ 画布（SortableContext/useSortable，handle 经 setActivatorNodeRef 绑到把手）；物料拖入按落点 `insertField(field, index)`（store 新增 action——Vue 版由 sortablejs 的 clone+v-model 隐式完成）；PointerSensor `distance: 5` 区分点击与拖拽；DragOverlay 浮层跟随指针（portal 渲染，样式用顶层类 `tb-*`）；碰撞检测 pointerWithin 优先、rectIntersection 兜底。**防重复添加**：拖拽结束后浏览器可能对原地小位移拖拽补发 click，`suppressPaletteClickRef` + `setTimeout(0)` 吸收
+  - **4.1 真修正**：Vue 版 PropertyPanel 的 tab 状态是组件内部 ref、未上报父级，父级 `schemaJson` computed 依赖的 `rightTab` 恒为 'config'——Schema 预览页恒空白。React 版 tab 提升为受控 props，激活 Schema 页时才计算 JSON（保留按需计算优化，行为回归设计意图）
+  - **4.1 结构简化**：builder store 迁 Zustand 后 fields 直接存数组（Vue 版 fieldIds+fieldsById 是 Pinia 响应式性能优化，React 不变式更新不需要）；`loadFields` 保留「同集合仅重排时不清选中」语义；ConfigItem 类型统一由 PropertyPanel 导出（Vue 版两文件重复定义）
+  - **4.2 清单口径修正**：清单写的「视频标注、键盘快捷键」在 Vue 版实际代码中不存在（grep video/keydown 零命中，属清单撰写时的预期），照实迁移不添功能（同 3.11 MonitoringBoard 先例）。实际功能面：跨 tab 锁 + 悲观编辑锁 + 草稿持久化 + 实时预审 + 领取池 + WS 联动
+  - **4.2 hook 语义转换**：useEditLock 的 watch → `effect[itemId, enabled]`，claim/release 回调经 latest-ref 取最新（每渲染新引用不触发锁重同步），Promise 链串行化与卸载释放语义保留；useLivePreReview 的深度 watch + 防抖 → formState 引用变化触发防抖快照 + useMemo 重算，规则计算提为模块级纯函数
+  - **4.2 表单策略**：Vue 版 a-form rules 实际未在提交时校验（无 validateFields 调用，rules 只有失焦视觉），React 版直接去掉 antd Form 实例——Form.Item `required` 标红星 + 预审结果驱动 validateStatus/help，受控组件绑 formState，行为与 Vue 版一致且视觉统一；fieldHelpers 相应删除 buildFieldRules。**effect 顺序约束落地**：「切条目重置表单」的 effect 必须声明在 useDraftPersistence 调用之前（先重置、草稿恢复覆盖），对应 Vue 版的 watch 注册顺序注释；`data-field-key` 挂在包裹 div 上（antd Form.Item 不保证透传 data-* 属性）
+  - **4.3 composable → hook**：useReviewFilters 的 reactive filters → `setFilter(patch)`；useReviewClaimPool 里 message/Modal 静态调用改 `App.useApp()`（hook 内合法）；虚拟列表直接接 React 版 useVirtualList，`itemHeight` 用模块级函数保证引用稳定（hook 的 useMemo 依赖它）
+  - **4.3 真修正**：Vue 版 queryDataItemId 的 watch（immediate）在数据未返回时定位失效且不再重触发，靠自动选中兜底选到错误条目；React 版等 dataItems 就绪后完成一次定位（queryLocatedRef 守卫，query 变化时重置）
+  - **4.3 React 化细节**：审核后 `selectNextActionable` 基于操作发起时渲染的 listRows 闭包计算——除被处理条目外其余行未变且查找显式跳过该条目，结论与最新列表一致（代码注释说明）；选中项 scrollIntoView 加 prevSelectedIdRef 守卫，仅 selectedId 真变化时滚动，WS 刷新列表不会把用户滚走的视口拉回
+  - **通用约定延续**：样式沿用根类前缀；portal 内容（Modal / DragOverlay / Spin wrapper）用页面缩写顶层类（tb-/aw-/rw-）区分；keyframes 名加页面前缀（React 无 scoped hash，防跨页冲突）；Spin 的 flex 高度链穿透用 wrapperClassName 替代 `> :deep(...)`
+  - **构建产物**：index 主包 899.98kB（gzip 287kB）与阶段 3 持平；dnd-kit 随 TemplateBuilder 页面 chunk（77kB/gzip 26kB）仅 /templates/builder 按需加载
