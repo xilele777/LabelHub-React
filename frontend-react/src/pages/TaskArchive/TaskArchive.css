@@ -1,0 +1,29 @@
+.archive-page .archive-card {
+  background: #fff;
+  border-color: var(--lh-border);
+  box-shadow: none;
+}
+
+.archive-page .page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.archive-page .detail-body,
+.detail-body {
+  width: 100%;
+}
+
+.archive-page .pre-wrap {
+  white-space: pre-wrap;
+}
+
+.json-block {
+  max-height: 260px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

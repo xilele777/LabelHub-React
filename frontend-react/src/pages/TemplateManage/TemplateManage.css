@@ -1,0 +1,20 @@
+.template-manage-page .search-input {
+  width: min(280px, 100%);
+}
+
+.template-manage-page .schema-preview,
+.schema-preview {
+  max-height: 300px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  background: #f8fafd;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+@media (max-width: 576px) {
+  .template-manage-page .search-input {
+    width: 100%;
+  }
+}

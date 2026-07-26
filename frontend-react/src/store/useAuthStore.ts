@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { UserInfo } from '../types';
 import { AUTH_EXPIRED_EVENT } from '../api/authEvents';
 import { resetUnauthorizedRedirect } from '../api/request';
+import { useListCacheStore } from './useListCacheStore';
 
 export interface AuthState {
   user: UserInfo | null;
@@ -87,6 +88,9 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     const storage = getStorage();
     storage?.removeItem(USER_KEY);
     storage?.removeItem(TOKEN_KEY);
+
+    // 列表页筛选缓存是会话级的，登出/登录过期后不应残留给下一个用户
+    useListCacheStore.getState().resetListCache();
 
     set({
       user: null,

@@ -1,0 +1,52 @@
+.data-export-page .panel-card,
+.data-export-page .metric-card,
+.data-export-page .export-card,
+.data-export-page .app-table-card {
+  height: 100%;
+  box-shadow: none;
+}
+
+.data-export-page .export-card .ant-card-body {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.data-export-page .export-config-card .ant-card-body {
+  padding: 18px;
+}
+
+.data-export-page .field-label {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.data-export-page .full-control {
+  width: 100%;
+}
+
+.data-export-page .segmented-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.data-export-page .preview-text {
+  display: inline-block;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+@media (max-width: 576px) {
+  .data-export-page .segmented-group,
+  .data-export-page .segmented-group .ant-radio-button-wrapper {
+    width: 100%;
+  }
+
+  .data-export-page .segmented-group .ant-radio-button-wrapper {
+    text-align: center;
+  }
+}

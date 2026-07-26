@@ -43,18 +43,18 @@
 
 每页统一验收标准：与 Vue 版对照，列表/表单/操作行为一致，无 console 报错，lint 通过。
 
-- [ ] **3.1 Dashboard**（echarts，先做，验证图表封装 hook）
-- [ ] **3.2 TaskList**（317 行，表格 + 筛选分页）
-- [ ] **3.3 TaskForm**（353 行，创建/编辑复用）
-- [ ] **3.4 TaskDetail + 子组件**（371 行 + AnnotationAssignmentPanel 301 行等）
-- [ ] **3.5 UserManage**（333 行）
-- [ ] **3.6 TemplateManage**
-- [ ] **3.7 TaskArchive**（329 行）
-- [ ] **3.8 DataExport**（304 行，注意 exportWorker 联动）
-- [ ] **3.9 NotificationManage**（325 行）+ **NotificationPublish**
-- [ ] **3.10 StatisticsBoard**（echarts）
-- [ ] **3.11 MonitoringBoard**（468 行，echarts + 轮询/实时）
-- [ ] **3.12 Exception 页**（Forbidden / NotFound）
+- [x] **3.1 Dashboard**（echarts，先做，验证图表封装 hook）
+- [x] **3.2 TaskList**（317 行，表格 + 筛选分页）
+- [x] **3.3 TaskForm**（353 行，创建/编辑复用）
+- [x] **3.4 TaskDetail + 子组件**（371 行 + AnnotationAssignmentPanel 301 行等）
+- [x] **3.5 UserManage**（333 行）
+- [x] **3.6 TemplateManage**
+- [x] **3.7 TaskArchive**（329 行）
+- [x] **3.8 DataExport**（304 行，注意 exportWorker 联动）
+- [x] **3.9 NotificationManage**（325 行）+ **NotificationPublish**
+- [x] **3.10 StatisticsBoard**（echarts）
+- [x] **3.11 MonitoringBoard**（468 行，echarts + 轮询/实时）
+- [x] **3.12 Exception 页**（Forbidden / NotFound）
 
 ## 阶段 4：三大工作台攻坚（每个一个专注会话 + 人工验证，串行）
 
@@ -98,3 +98,12 @@
   - **阶段 3 占位**：16 条业务路由的 Component 均为 null → PlaceholderPage；迁移某页时在 router/routes.tsx 把 null 换成 `lazy(() => import(...))` 即可（Suspense fallback=SkeletonLoader 已就位）
   - **明确不迁/延后**：keep-alive（TaskList/TemplateManage 状态缓存）无 React 原生等价物，阶段 3 用 store 持久化筛选状态替代；page-fade out-in 过渡简化为进入动画（避免引 react-transition-group）
   - **体积基线**：入口 index chunk 890kB（gzip 284kB，antd 未拆），阶段 5.2 页面懒加载接入后再做分包对齐
+- 2026-07-26/27 **阶段 3 完成**（验收全绿：build 零错误 / lint 零告警 / 测试 64/64；dev 冒烟：/login、/tasks 200，全部 11 个页面模块 + useECharts/useListCacheStore 经 vite 转换 200）。16 条业务路由全部从占位页换成 `lazy(() => import(...))`。要点：
+  - **echarts hook 落位**：新增 `hooks/useECharts.ts`（init/dispose/ResizeObserver/setOption 暂存补投），containerRef 为 callback ref——图表容器在 `total===0` 空态分支下不存在，出现/销毁随条件渲染，等价 Vue watch(chartRef)。echarts.use 按需注册仍留在页面侧（保持按需引入优化）。实际只有 MonitoringBoard 用 echarts；Dashboard/StatisticsBoard 的 Vue 版本就是 antd Progress/List，照实迁移
+  - **keep-alive 替代落地**：新增 `store/useListCacheStore.ts`（会话级），TaskList 缓存 keyword/status/page、TemplateManage 缓存 keyword/page，页面挂载取初值→详情页返回恢复筛选与页码；`clearSession` 时 `resetListCache()` 防止残留给下一个登录用户。Vue 版 `onActivated` 重新拉数据的语义由 React 挂载即 fetch 天然覆盖
+  - **两处 React 化修正**（照抄会有 bug）：① TaskList/TemplateManage 筛选变化回第一页改为**渲染期同步 setState**（对比 prevFiltersKey），Vue watch 时序下先改页码再请求是安全的，React 若用 effect 会先用旧页码多发一次请求；TaskList 另加请求序号守卫丢弃过期响应。② 分配面板（Annotation/Review）刷新列表时用 latest-ref 只补齐新 id 的映射，保留用户已选未提交的下拉值——Vue reactive 的 `id in map` 判断在 React setState 全量替换下会覆盖用户编辑
+  - **表单页转换**：TaskForm/UserManage/NotificationPublish 从 reactive 双绑改 antd Form 受控（rules 内联、`Form.useWatch` 做类型联动清空 templateId、确认密码用 `dependencies` + validator）；TaskForm 的 datetime-local 原生 input 直接作为 Form.Item 子组件受控（value/onChange 协议兼容）
+  - **NotificationManage 「复制再发」**：Vue `router.push({query})` → `URLSearchParams` 拼 `/notifications/publish?title=...&message=...`，Publish 侧 `useSearchParams` 预填
+  - **MonitoringBoard 首载失败提示**：`fetchSummary` 改为返回错误串（React setState 异步，Vue 版 then 后读 error.value 的写法读不到最新值），仅首次挂载弹 warning，语义与 Vue onMounted 一致。另注：清单原文写"轮询/实时"，Vue 版实际是手动刷新 + 天数切换重拉，React 版照实对齐、未加轮询
+  - **样式迁移约定**：Vue scoped → 每页独立 css 文件 + 页面根类作用域前缀（`.task-list-page .search-input`），`:deep(...)` 直接展开为后代选择器；global.css 两工程本就同源无需改动
+  - **构建产物**：全部页面懒加载后 index chunk 899kB（gzip 287kB，与阶段 2 基线 890kB 持平，antd 主包未拆），echarts 独立 chunk 554kB（gzip 190kB）仅 /monitoring 按需加载，页面级 chunk 1.1–17kB。5.2 再做 manualChunks 对齐

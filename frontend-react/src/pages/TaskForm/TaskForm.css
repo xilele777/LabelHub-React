@@ -1,0 +1,46 @@
+.task-form-page .page-title {
+  margin: 0;
+}
+
+.task-form-page .form-card {
+  max-width: 860px;
+}
+
+.task-form-page .time-card {
+  margin-bottom: 24px;
+  background: #fff;
+}
+
+.task-form-page .field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.task-form-page .native-input {
+  width: 100%;
+  height: 32px;
+  padding: 4px 11px;
+  color: #202124;
+  background: #fff;
+  border: 1px solid var(--lh-border-strong);
+  border-radius: 6px;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.task-form-page .native-input:focus {
+  border-color: var(--lh-primary);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.14);
+}
+
+.task-form-page .full-control {
+  width: 100%;
+}
+
+.task-form-page .form-actions {
+  padding-top: 4px;
+  margin-bottom: 0;
+}

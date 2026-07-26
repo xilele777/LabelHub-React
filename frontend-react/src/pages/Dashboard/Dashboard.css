@@ -1,0 +1,51 @@
+/* Vue scoped 样式的等价迁移：全部收敛到 .dashboard-page 作用域下，避免与其他页面同名类冲突。
+   metric-card / panel-card 的基础外观已在 global.css 定义，这里只放页面特有的差异。 */
+
+.dashboard-page .role-tag {
+  margin-left: 8px;
+}
+
+.dashboard-page .metric-card,
+.dashboard-page .panel-card {
+  height: 100%;
+}
+
+.dashboard-page .metric-card__hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.dashboard-page .panel-card {
+  overflow: hidden;
+  background: #fff;
+  border-color: var(--lh-border) !important;
+}
+
+.dashboard-page .panel-card .ant-card-body {
+  min-height: 220px;
+}
+
+.dashboard-page .panel-card .ant-table-wrapper {
+  margin: -4px 0;
+}
+
+.dashboard-page .panel-card .ant-list-item {
+  padding-inline: 0;
+}
+
+.dashboard-page .panel-card .ant-list-item:not(:last-child) {
+  border-bottom-color: #eef2f6;
+}
+
+.dashboard-page__content {
+  margin-top: 0;
+}
+
+.dashboard-page .template-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}

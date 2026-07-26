@@ -1,0 +1,30 @@
+.notification-manage-page .page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.notification-manage-page .page-icon {
+  color: var(--lh-primary);
+}
+
+.notification-manage-page .search-input {
+  width: min(280px, 100%);
+}
+
+.notification-manage-page .read-rate {
+  display: block;
+  font-size: 12px;
+}
+
+.notification-manage-page .message-content,
+.message-content {
+  white-space: pre-wrap;
+}
+
+@media (max-width: 576px) {
+  .notification-manage-page .search-input {
+    width: 100%;
+  }
+}

@@ -1,4 +1,4 @@
-import type { ComponentType, LazyExoticComponent, ReactNode } from 'react';
+import { lazy, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react';
 import { Role } from '../types';
 import PlaceholderPage from '../pages/PlaceholderPage';
 
@@ -26,49 +26,49 @@ export const asyncRoutes: AsyncRouteConfig[] = [
     name: 'Dashboard',
     title: '仪表盘',
     roles: [Role.ADMIN, Role.ANNOTATOR, Role.REVIEWER],
-    Component: null,
+    Component: lazy(() => import('../pages/Dashboard')),
   },
   {
     path: 'tasks',
     name: 'TaskList',
     title: '任务列表',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/TaskList')),
   },
   {
     path: 'tasks/create',
     name: 'TaskCreate',
     title: '创建任务',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/TaskForm')),
   },
   {
     path: 'tasks/detail',
     name: 'TaskDetail',
     title: '任务详情',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/TaskDetail')),
   },
   {
     path: 'tasks/edit',
     name: 'TaskEdit',
     title: '编辑任务',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/TaskForm')),
   },
   {
     path: 'archive',
     name: 'TaskArchive',
     title: '任务归档',
     roles: [Role.ADMIN, Role.ANNOTATOR, Role.REVIEWER],
-    Component: null,
+    Component: lazy(() => import('../pages/TaskArchive')),
   },
   {
     path: 'templates',
     name: 'TemplateManage',
     title: '模板管理',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/TemplateManage')),
   },
   {
     path: 'templates/builder',
@@ -96,42 +96,42 @@ export const asyncRoutes: AsyncRouteConfig[] = [
     name: 'DataExport',
     title: '数据导出',
     roles: [Role.ADMIN, Role.REVIEWER],
-    Component: null,
+    Component: lazy(() => import('../pages/DataExport')),
   },
   {
     path: 'statistics',
     name: 'StatisticsBoard',
     title: '统计看板',
     roles: [Role.ADMIN, Role.REVIEWER],
-    Component: null,
+    Component: lazy(() => import('../pages/StatisticsBoard')),
   },
   {
     path: 'monitoring',
     name: 'MonitoringBoard',
     title: '性能监控',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/MonitoringBoard')),
   },
   {
     path: 'users',
     name: 'UserManage',
     title: '用户管理',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/UserManage')),
   },
   {
     path: 'notifications/publish',
     name: 'NotificationPublish',
     title: '通知发布',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/NotificationPublish')),
   },
   {
     path: 'notifications/manage',
     name: 'NotificationManage',
     title: '通知管理',
     roles: [Role.ADMIN],
-    Component: null,
+    Component: lazy(() => import('../pages/NotificationManage')),
   },
 ];
 

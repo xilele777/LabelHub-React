@@ -1,0 +1,52 @@
+.statistics-page .page-title {
+  margin: 0;
+}
+
+.statistics-page .card-desc {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.statistics-page .rank-row,
+.statistics-page .distribution-row {
+  display: grid;
+  grid-template-columns: max-content minmax(90px, 1fr) minmax(120px, 220px) max-content;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.statistics-page .rank-progress {
+  min-width: 0;
+  width: 100%;
+}
+
+.statistics-page .panel-card {
+  height: 100%;
+}
+
+.statistics-page .pass-rate-card .ant-card-body {
+  display: grid;
+  justify-items: center;
+}
+
+.statistics-page .pass-rate-detail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .statistics-page .rank-row,
+  .statistics-page .distribution-row {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+  }
+
+  .statistics-page .rank-row .rank-progress,
+  .statistics-page .distribution-row .rank-progress {
+    grid-column: 1 / -1;
+  }
+}
