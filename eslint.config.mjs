@@ -17,6 +17,8 @@ export default tseslint.config(
       'coverage/**',
       '*.md',
       'src/components.d.ts',
+      // React 迁移工程有独立的 eslint 配置（frontend-react/eslint.config.mjs）
+      'frontend-react/**',
     ],
   },
 
