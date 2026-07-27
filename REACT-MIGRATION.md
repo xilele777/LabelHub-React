@@ -77,10 +77,10 @@
 
 ## 阶段 6：切换上线
 
-- [ ] **6.1 全页面人工回归** — 三种角色（ADMIN/ANNOTATOR/REVIEWER）各走一遍主流程，对照 Vue 版。
+- [x] **6.1 全页面人工回归** — 三种角色（ADMIN/ANNOTATOR/REVIEWER）各走一遍主流程，对照 Vue 版。
 - [x] **6.2 目录切换** — `frontend-react/` 内容替换 `src/`（或调整 server 静态托管指向新 dist），删除 vue 依赖，更新 package.json/CI/husky 配置。验收：干净 clone 后 `npm ci && npm run build` 成功。**防护：删除根 Vue 依赖后必须在 frontend-react 重跑全套验收**——嵌套工程会沿目录向上静默解析父级 node_modules（阶段 1 已实际踩坑：tsc 借父级 vue 通过了类型检查）。
 - [ ] **6.3 部署验证** — 按 DEPLOY.md 流程发布到 ECS（pm2 + Node22 + 3001），线上冒烟：登录、标注、审核、导出、WebSocket 通知。
-- [ ] **6.4 收尾** — 合并或保留分支决策；README 技术栈说明更新。
+- [x] **6.4 收尾** — 合并或保留分支决策；README 技术栈说明更新。
 
 ## 进度记录
 
@@ -136,3 +136,11 @@
   - **frontend-react 提升**：src→项目根 src，删除 frontend-react 目录
   - **Vue 源码清理**：删除全部 .vue/composables/router/index.ts/components.d.ts
   - **build:check 口径升级**：chunk 前缀匹配→index.html 预加载解析，阈值 160 kB gzip
+
+- 2026-07-27 **阶段 6.1 + 6.4 完成**（6.1 人工回归：三角色主流程跑通；6.4 收尾后本地全链路复验绿：build:check 149.0 kB gzip / lint 零错误 / tsc 零错误 / 测试 81/81 / server E2E 99/99）。要点：
+  - **CI 修复（6.2 漏网）**：prettier glob `src/**/*.{ts,vue}` → `{ts,tsx}`——旧 glob 漏检全部 .tsx 文件且 .vue 已不存在；CI 仅在 main 触发，迁移分支从未跑过该步，合并前必须修。node-version 20 → 22（4 处）——Node 20 已 EOL（DEPLOY.md 记载），与生产 ECS 的 Node 22 对齐
+  - **孤儿配置清理**：删除 tsconfig.app.json——Vue 模板工程「根 references 子配置」结构的残留，React 版 tsconfig.json 已是无 references 的单配置，无任何引用方；同步修 Dockerfile 的 COPY 行（引用已删文件会让 docker build 直接失败）。删后 `tsc -b --force` 复验零错误
+  - **prettier 虚警排查**：本地 `--check "src/**/*.{ts,tsx}"` 报 25 文件失败，实为 autocrlf 行尾差异（工作区 CRLF vs prettier endOfLine=lf），git blob 均为 LF、`--write` 后 git diff 零实质变化，CI（Linux checkout LF）不受影响
+  - **README**：badge 与技术栈行 Vue 3/Pinia/Vue Router 4/Ant Design Vue → React 19/Zustand/React Router 7/Ant Design 5（补 dnd-kit、Testing Library），增加迁移记录链接
+  - **注释残留清理**：server/index.js SPA fallback（Vue Router→React Router）、securityHeaders.js CSP（Ant Design Vue 4→Ant Design 5，CSS-in-JS 需 unsafe-inline 的理由两代组件库相同）
+  - **分支决策**：react-migration 合并进 main——迁移验收全绿 + 人工回归完成，生产部署从 main 拉取；分支暂留作里程碑标记，Vue 版完整历史可经 git 回溯（切换点 b88c061 的父提交）

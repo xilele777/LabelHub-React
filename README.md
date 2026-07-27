@@ -2,7 +2,7 @@
 
 面向数据标注团队的全栈协作平台，覆盖模板搭建、任务分发、标注与审核工作台、AI 规则预审、实时通知、统计看板和数据导出。
 
-[![Vue 3](https://img.shields.io/badge/Vue-3.x-4FC08D?logo=vue.js)](https://vuejs.org/)
+[![React 19](https://img.shields.io/badge/React-19.x-61DAFB?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite)](https://vitejs.dev/)
 [![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express)](https://expressjs.com/)
@@ -26,11 +26,13 @@ LabelHub 是一个面向标注团队的协作式 B 端平台，支持从模板�
 
 ## 技术栈
 
-- 前端：Vue 3、TypeScript、Vite、Pinia、Vue Router 4、Ant Design Vue、ECharts
+- 前端：React 19、TypeScript、Vite、Zustand、React Router 7、Ant Design 5、ECharts、dnd-kit
 - 后端：Node.js、Express、Socket.IO
 - 数据库：SQLite，支持切换 PostgreSQL
 - 缓存与扩展：Redis 可选接入
-- 测试：Vitest、后端 E2E 测试
+- 测试：Vitest、Testing Library、后端 E2E 测试
+
+> 前端于 2026-07 从 Vue 3 迁移至 React 19，迁移过程与验收记录见 [REACT-MIGRATION.md](./REACT-MIGRATION.md)。
 
 ## 快速开始
 
