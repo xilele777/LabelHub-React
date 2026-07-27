@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:check": "npm run build && node scripts/check-bundle-size.cjs",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 50",
     "lint:fix": "eslint . --fix",

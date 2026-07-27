@@ -1,4 +1,5 @@
-import { App as AntdApp, ConfigProvider } from 'antd';
+import { Suspense } from 'react';
+import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { RouterProvider } from 'react-router/dom';
 import { router } from './router';
@@ -18,13 +19,24 @@ const googleTheme = {
   },
 };
 
+// 顶层路由 chunk（MainLayout/Login）加载期的 fallback。
+// 不可使用 SkeletonLoader —— 它依赖 antd，会把组件库拉回入口预加载链
+function AppLoading() {
+  return (
+    <div className="app-boot-loading">
+      <span className="app-boot-spinner" aria-label="加载中" />
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <ConfigProvider locale={zhCN} theme={googleTheme}>
-      {/* antd App 上下文：使 message/modal/notification 静态方法继承主题 */}
-      <AntdApp>
+      {/* antd 的 App 上下文组件不在此全局挂载（体积原因），
+          由 MainLayout 与 Login 在各自懒加载 chunk 内就地提供 */}
+      <Suspense fallback={<AppLoading />}>
         <RouterProvider router={router} />
-      </AntdApp>
+      </Suspense>
     </ConfigProvider>
   );
 }

@@ -57,9 +57,11 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
-          // 对象形式的 manualChunks 会强制打包所列模块，因此只列已实际引用的包
+          // 对象形式的 manualChunks 会强制打包所列模块，因此只列已实际引用的包。
+          // react-dom/client 须显式列出：数组项按解析后的模块匹配，只写 'react-dom'
+          // 匹配不到 client 子路径入口，react-dom 实现体会漏进 entry chunk
           manualChunks: {
-            react: ['react', 'react-dom', 'react-router'],
+            react: ['react', 'react-dom', 'react-dom/client', 'react-router'],
             request: ['axios'],
             state: ['zustand'],
             realtime: ['socket.io-client'],

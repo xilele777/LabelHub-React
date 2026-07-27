@@ -1,10 +1,14 @@
+import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
-import MainLayout from '../layouts/MainLayout';
-import Login from '../pages/Login';
-import Forbidden from '../pages/Exception/Forbidden';
-import NotFound from '../pages/Exception/NotFound';
 import { RedirectIfAuthed, RequireAuth, RequireRole } from './guards';
 import { asyncRoutes, renderRouteElement, type RouteHandle } from './routes';
+
+// 入口体积预算约束：MainLayout/Login 携带 antd 组件与 socket.io 依赖，
+// 必须懒加载以将组件库排除出入口预加载链（对齐 Vue 版 313kB 基线的分包策略）
+const MainLayout = lazy(() => import('../layouts/MainLayout'));
+const Login = lazy(() => import('../pages/Login'));
+const Forbidden = lazy(() => import('../pages/Exception/Forbidden'));
+const NotFound = lazy(() => import('../pages/Exception/NotFound'));
 
 export { asyncRoutes };
 export type { RouteHandle };

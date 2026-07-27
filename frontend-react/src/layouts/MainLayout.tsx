@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  App as AntdApp,
   Avatar,
   Badge,
   Button,
@@ -499,7 +500,9 @@ export default function MainLayout() {
   );
 
   return (
-    <>
+    // AntdApp 挂在 MainLayout（懒加载 chunk）而非入口 App.tsx：
+    // 其 message/notification/Modal 实现链体积大，置于入口会显著拉大首屏预加载
+    <AntdApp>
       {/* 无障碍：跳过导航直达内容的隐藏链接（Tab 聚焦时可见） */}
       <a href="#main-content" className="skip-to-content">
         跳至内容
@@ -582,6 +585,6 @@ export default function MainLayout() {
           </Layout.Content>
         </Layout>
       </Layout>
-    </>
+    </AntdApp>
   );
 }

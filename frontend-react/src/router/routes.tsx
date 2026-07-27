@@ -1,6 +1,5 @@
 import { lazy, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react';
 import { Role } from '../types';
-import PlaceholderPage from '../pages/PlaceholderPage';
 
 /** 路由 handle 元信息（等价 Vue RouteMeta），MainLayout 经 useMatches 读取 title */
 export interface RouteHandle {
@@ -12,8 +11,8 @@ export interface AsyncRouteConfig {
   name: string;
   title: string;
   roles: Role[];
-  /** 页面组件；阶段 3 迁移完成前为 null，路由层自动落到占位页 */
-  Component: LazyExoticComponent<ComponentType> | ComponentType | null;
+  /** 页面组件，一律 React.lazy 懒加载（迁移期的 PlaceholderPage 兜底已随阶段 3 完成移除） */
+  Component: LazyExoticComponent<ComponentType> | ComponentType;
 }
 
 /**
@@ -137,6 +136,5 @@ export const asyncRoutes: AsyncRouteConfig[] = [
 
 export function renderRouteElement(route: AsyncRouteConfig): ReactNode {
   const PageComponent = route.Component;
-  if (!PageComponent) return <PlaceholderPage title={route.title} />;
   return <PageComponent />;
 }

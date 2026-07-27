@@ -13,7 +13,8 @@ const serverRoot = path.join(__dirname, '..');
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'labelhub-e2e-'));
 const dbPath = path.join(tempDir, 'labelhub.db');
 
-function waitForHealth(timeoutMs = 10000) {
+// Windows 冷启动（better-sqlite3 原生模块加载 + 空库自动 seed）实测可超过 10s，超时给足 30s
+function waitForHealth(timeoutMs = 30000) {
   const deadline = Date.now() + timeoutMs;
 
   return new Promise((resolve, reject) => {

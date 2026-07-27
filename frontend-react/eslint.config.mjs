@@ -39,4 +39,14 @@ export default tseslint.config(
       'no-undef': 'off',
     },
   },
+
+  // ── Standalone Node.js scripts（对齐根工程配置段）────────
+  {
+    files: ['scripts/**/*.{js,mjs,cjs}'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      'no-console': 'off',
+      'no-undef': 'off',
+    },
+  },
 );

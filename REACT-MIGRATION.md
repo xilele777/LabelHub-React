@@ -70,10 +70,10 @@
 
 ## 阶段 5：测试与工程化收尾（1-2 个会话）
 
-- [ ] **5.1 补齐测试** — 9 个测试文件全绿；关键页面补 Testing Library 冒烟测试（渲染不炸 + 主要交互）。
-- [ ] **5.2 打包体积对齐** — 适配 `scripts/check-bundle-size.cjs` 预算；对照简历优化清单里的指标（入口预加载 313kB 基线），React 版不劣化超过 20%，否则做分包优化。
-- [ ] **5.3 web-vitals 上报** — webVitals service 接入 React 入口，验证上报正常。
-- [ ] **5.4 server E2E** — `cd server && npm run test:e2e` 全绿（理论上不受影响，跑一遍确认）。
+- [x] **5.1 补齐测试** — 9 个测试文件全绿；关键页面补 Testing Library 冒烟测试（渲染不炸 + 主要交互）。
+- [x] **5.2 打包体积对齐** — 适配 `scripts/check-bundle-size.cjs` 预算；对照简历优化清单里的指标（入口预加载 313kB 基线），React 版不劣化超过 20%，否则做分包优化。
+- [x] **5.3 web-vitals 上报** — webVitals service 接入 React 入口，验证上报正常。
+- [x] **5.4 server E2E** — `cd server && npm run test:e2e` 全绿（理论上不受影响，跑一遍确认）。
 
 ## 阶段 6：切换上线
 
@@ -119,3 +119,13 @@
   - **4.3 React 化细节**：审核后 `selectNextActionable` 基于操作发起时渲染的 listRows 闭包计算——除被处理条目外其余行未变且查找显式跳过该条目，结论与最新列表一致（代码注释说明）；选中项 scrollIntoView 加 prevSelectedIdRef 守卫，仅 selectedId 真变化时滚动，WS 刷新列表不会把用户滚走的视口拉回
   - **通用约定延续**：样式沿用根类前缀；portal 内容（Modal / DragOverlay / Spin wrapper）用页面缩写顶层类（tb-/aw-/rw-）区分；keyframes 名加页面前缀（React 无 scoped hash，防跨页冲突）；Spin 的 flex 高度链穿透用 wrapperClassName 替代 `> :deep(...)`
   - **构建产物**：index 主包 899.98kB（gzip 287kB）与阶段 3 持平；dnd-kit 随 TemplateBuilder 页面 chunk（77kB/gzip 26kB）仅 /templates/builder 按需加载
+- 2026-07-27 **阶段 5 完成**（验收全绿：build 零错误 / lint 零告警 / 测试 81/81（14 文件，+5 文件 17 用例）/ dev(3100) 冒烟 200 / server E2E 99/99 / 体积门禁绿）。要点：
+  - **5.2 入口预加载 1094kB→449kB raw（gzip 354→153）**，四刀：① MainLayout/Login/Forbidden/NotFound 改路由懒加载，App.tsx 顶层 Suspense 的 fallback 用零依赖 CSS spinner（不可用 SkeletonLoader——它引 antd 会把组件库拉回入口）；② AntdApp 从 App.tsx 下沉——其 message/notification/Modal 实现链体积大，改由 MainLayout 顶层与 Login chunk 内各自就地包裹（路由互斥不冲突，主题仍继承全局 ConfigProvider）；③ 删除 PlaceholderPage——阶段 3 完成后已是死代码，但被 routes.tsx 顶层同步 import，其 Result/Typography 引用链（→Input/Tooltip/trigger/resize-observer）带约 290kB rendered 进 entry；④ manualChunks react 组补列 `react-dom/client`——对象形式按解析后的模块入口匹配，只写 'react-dom' 匹配不到 client 子路径，react-dom 实现体（540kB rendered）一直漏在 entry chunk 里
+  - **与 Vue 基线对照**（口径统一为 index.html 的 entry+modulepreload JS）：Vue 版 306kB raw / 111kB gzip（entry+vue+request 3 chunk），React 版 449kB raw / 153kB gzip（entry+react+request+state 4 chunk）。React entry 本身 116kB 已低于 Vue entry 的 153kB，组件库零进入口；超出部分全部来自 react-dom+react-router 对 vue+vue-router+pinia 的框架固有体积差（react chunk 286kB vs vue chunk 108kB），gzip 劣化 +38% 超过 20% 容差属选型代价而非分包欠账，如实记录。继续压缩只能把首屏必需库挤出预加载改成串行瀑布，真实首屏更慢，不做
+  - **门禁落地**：新增 `frontend-react/scripts/check-bundle-size.cjs`（`npm run build:check`），口径升级为直接解析 dist/index.html 的预加载集合（比 Vue 版 chunk 名前缀匹配准确），防回归线：入口预加载 gzip<160kB、单 chunk gzip<200kB（当前 153 / 186-echarts）
+  - **5.1 冒烟测试**（`src/__tests__/*.smoke.test.tsx` + helpers/smoke.tsx 工厂）：Login（渲染/成功按角色跳转/redirect 安全跳转/失败提示留在登录页）、Dashboard（统计卡片/挂载拉取/刷新重拉）、TaskList（渲染/会话缓存页码恢复/筛选变化回第一页并携关键字重发）、MainLayout（ADMIN 与 ANNOTATOR 菜单差异/Outlet 子页/WS connect-disconnect 生命周期）。mock 边界约定：页面直调的 api 模块 vi.mock；store 的 fetch action 用 setState 覆盖（zustand 可直接替换 action 字段，最薄）；WS service 用 importOriginal 展开的部分 mock
+  - **vitest 提速 30 倍**：antd/@ant-design/icons 是数千个 ESM 小模块，组件测试 import 阶段 155s；vitest.config 加 `deps.optimizer.web`（esbuild 预打包，同 vite optimizeDeps 机制）后全量 14 文件 7.5s
+  - **5.3 web-vitals**：initWebVitals 阶段 1 已随 main.tsx 接入（仅 PROD 采集 LCP/INP/CLS/FCP/TTFB），本阶段补单测 4 例（环境开关/五项注册/beacon 载荷/CLS×1000 取整）+ 端点实测 POST /api/web-vitals → 204（server monitoring.js textParser 收 sendBeacon 落库）
+  - **5.4 server E2E**：以 `node test/run-e2e-isolated.js`（临时隔离库+3191 端口自起 server）代替清单写的 `npm run test:e2e`——后者直连 3001 且前置要求清空开发数据库；99/99 通过率 100%。**修正一处**：waitForHealth 超时 10s→30s，Windows 冷启动（better-sqlite3 原生模块加载+空库自动 seed）实测超 10s，原值导致 server 实际起来了却被判失败、还留下孤儿进程占住端口误导后续排查
+  - **工具链发现**：本机 Git Bash 非 tty 环境下裸 `node` 命令不可执行（打印 stdin is not a tty 后退出），必须用 `node.exe`；npm 脚本不受影响（npm.cmd 内部走绝对路径），此前阶段未暴露
+  - **eslint**：frontend-react 的 `scripts/**` 补 Node 规则段（no-undef/no-console 关闭，对齐根工程既有配置段）

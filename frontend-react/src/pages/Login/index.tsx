@@ -17,7 +17,7 @@ function getSafeRedirect(value: unknown, fallback: string) {
   return value;
 }
 
-export default function Login() {
+function LoginInner() {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -92,5 +92,15 @@ export default function Login() {
         </Card>
       </Spin>
     </main>
+  );
+}
+
+// AntdApp 就地包裹（Login 位于 MainLayout 之外）：为 useApp() 提供上下文，
+// 且保持该依赖留在 Login 懒加载 chunk 内、不进入口 App.tsx
+export default function Login() {
+  return (
+    <App>
+      <LoginInner />
+    </App>
   );
 }
