@@ -1,5 +1,4 @@
-import { computed, ref } from 'vue';
-import { defineStore } from 'pinia';
+import { create } from 'zustand';
 import type { TemplateItem } from '../types';
 import * as templateApi from '../api/template';
 
@@ -11,100 +10,93 @@ export interface TemplateState {
   error: string | null;
 }
 
-let nextId = 100;
-
-const useTemplatePiniaStore = defineStore('template', () => {
-  const templates = ref<TemplateItem[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  const templateCount = computed(() => templates.value.length);
-  const templateMap = computed(
-    () => new Map(templates.value.map((template) => [template.id, template])),
-  );
-
-  async function fetchTemplates(): Promise<void> {
-    loading.value = true;
-    error.value = null;
-    try {
-      const res = await templateApi.getTemplateList();
-      templates.value = res.data.items;
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : '获取模板列表失败';
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function addTemplate(template: TemplateItem): Promise<void> {
-    loading.value = true;
-    error.value = null;
-    try {
-      const res = await templateApi.createTemplate(template);
-      templates.value = [res.data, ...templates.value];
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : '创建模板失败';
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function updateTemplate(id: string, updates: Partial<TemplateItem>): Promise<void> {
-    error.value = null;
-    try {
-      const res = await templateApi.updateTemplate(id, updates);
-      templates.value = templates.value.map((template) =>
-        template.id === id ? res.data : template,
-      );
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : '更新模板失败';
-      throw err;
-    }
-  }
-
-  async function deleteTemplate(id: string): Promise<void> {
-    error.value = null;
-    try {
-      await templateApi.deleteTemplate(id);
-      templates.value = templates.value.filter((template) => template.id !== id);
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : '删除模板失败';
-      throw err;
-    }
-  }
-
-  return {
-    templates,
-    loading,
-    error,
-    templateCount,
-    templateMap,
-    fetchTemplates,
-    addTemplate,
-    updateTemplate,
-    deleteTemplate,
-  };
-});
-
-export type TemplateStore = ReturnType<typeof useTemplatePiniaStore>;
-
-interface UseTemplateStore {
-  (): TemplateStore;
-  <T>(selector: (store: TemplateStore) => T): T;
-  getState: () => TemplateStore;
-  setState: (patch: Partial<TemplateState>) => void;
+/** 派生字段：随 templates 同步维护（Pinia 版为 computed） */
+interface TemplateDerived {
+  templateCount: number;
+  templateMap: Map<string, TemplateItem>;
 }
 
-export const useTemplateStore = ((selector?: (store: TemplateStore) => unknown) => {
-  const store = useTemplatePiniaStore();
-  return selector ? selector(store) : store;
-}) as UseTemplateStore;
+interface TemplateActions {
+  fetchTemplates(): Promise<void>;
+  addTemplate(template: TemplateItem): Promise<void>;
+  updateTemplate(id: string, updates: Partial<TemplateItem>): Promise<void>;
+  deleteTemplate(id: string): Promise<void>;
+}
 
-useTemplateStore.getState = () => useTemplatePiniaStore();
-useTemplateStore.setState = (patch) => {
-  useTemplatePiniaStore().$patch(patch as never);
-};
+export type TemplateStore = TemplateState & TemplateDerived & TemplateActions;
+
+let nextId = 100;
+
+function withDerived(templates: TemplateItem[]) {
+  return {
+    templates,
+    templateCount: templates.length,
+    templateMap: new Map(templates.map((template) => [template.id, template])),
+  };
+}
+
+export function createInitialTemplateState(): TemplateState & TemplateDerived {
+  return {
+    templates: [],
+    loading: false,
+    error: null,
+    templateCount: 0,
+    templateMap: new Map(),
+  };
+}
+
+export const useTemplateStore = create<TemplateStore>()((set, get) => ({
+  ...createInitialTemplateState(),
+
+  async fetchTemplates(): Promise<void> {
+    set({ loading: true, error: null });
+    try {
+      const res = await templateApi.getTemplateList();
+      set(withDerived(res.data.items));
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : '获取模板列表失败' });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  async addTemplate(template): Promise<void> {
+    set({ loading: true, error: null });
+    try {
+      const res = await templateApi.createTemplate(template);
+      set(withDerived([res.data, ...get().templates]));
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : '创建模板失败' });
+      throw err;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  async updateTemplate(id, updates): Promise<void> {
+    set({ error: null });
+    try {
+      const res = await templateApi.updateTemplate(id, updates);
+      set(
+        withDerived(get().templates.map((template) => (template.id === id ? res.data : template))),
+      );
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : '更新模板失败' });
+      throw err;
+    }
+  },
+
+  async deleteTemplate(id): Promise<void> {
+    set({ error: null });
+    try {
+      await templateApi.deleteTemplate(id);
+      set(withDerived(get().templates.filter((template) => template.id !== id)));
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : '删除模板失败' });
+      throw err;
+    }
+  },
+}));
 
 export function generateTemplateId(): string {
   return 'tpl' + String(nextId++).padStart(3, '0');

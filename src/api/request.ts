@@ -5,8 +5,14 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
+import { AUTH_EXPIRED_EVENT } from './authEvents';
 
-export const AUTH_EXPIRED_EVENT = 'labelhub:auth-expired';
+export { AUTH_EXPIRED_EVENT };
+
+/** 判断错误是否为 AbortController 取消导致（用于 catch 分支跳过透传） */
+export function isRequestCanceled(error: unknown): boolean {
+  return axios.isCancel(error) || (error instanceof DOMException && error.name === 'AbortError');
+}
 
 export interface ApiResponse<T = unknown> {
   code: number;
@@ -75,12 +81,13 @@ function isSuccessCode(code: number) {
 
 function resolveToken(config: RequestConfig) {
   if (config.skipAuth) return null;
-  const authStore = useAuthStore();
+  // Zustand：非组件上下文必须用 getState()，hook 形态调用会抛 Invalid hook call
+  const authStore = useAuthStore.getState();
   return authStore.token;
 }
 
 function handleUnauthorized() {
-  const authStore = useAuthStore();
+  const authStore = useAuthStore.getState();
   authStore.clearSession();
 
   if (typeof window !== 'undefined') {
@@ -177,6 +184,11 @@ instance.interceptors.response.use(
       const waitMs = baseDelay * Math.pow(2, retryCount) * jitter;
       await delay(waitMs);
       return instance.request(config!);
+    }
+
+    // 取消错误保持原样抛出，不包装为 ApiError（让调用方 catch 可区分取消）
+    if (isRequestCanceled(error)) {
+      return Promise.reject(error);
     }
 
     const status = error.response?.status;

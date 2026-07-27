@@ -1,4 +1,3 @@
-import { isProxy, toRaw } from 'vue';
 import {
   CSV_BOM,
   ExportFormat,
@@ -15,25 +14,6 @@ const pending = new Map<
   number,
   { resolve: (content: string) => void; reject: (error: Error) => void }
 >();
-
-/**
- * 深度去除 Vue 响应式代理：Proxy 对象无法通过 structured clone 传入 Worker，
- * postMessage 前需转换为普通对象（比 JSON 往返序列化开销小得多）。
- */
-function deepToRaw<T>(value: T): T {
-  const raw = (isProxy(value) ? toRaw(value) : value) as T;
-  if (Array.isArray(raw)) {
-    return raw.map((item) => deepToRaw(item)) as T;
-  }
-  if (raw && typeof raw === 'object') {
-    const output: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(raw)) {
-      output[key] = deepToRaw(item);
-    }
-    return output as T;
-  }
-  return raw;
-}
 
 function getWorker(): Worker | null {
   if (workerBroken || typeof Worker === 'undefined') return null;
@@ -84,7 +64,8 @@ function serializeExport(records: ExportRecord[], format: ExportFormat): Promise
   return new Promise<string>((resolve, reject) => {
     const id = ++seq;
     pending.set(id, { resolve, reject });
-    instance.postMessage({ id, format, records: deepToRaw(records) });
+    // Zustand 数据为普通对象，可直接 structured clone（Vue 版需先 deepToRaw 解响应式 Proxy）
+    instance.postMessage({ id, format, records });
   });
 }
 

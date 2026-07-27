@@ -1,5 +1,4 @@
-import { computed, ref } from 'vue';
-import { defineStore } from 'pinia';
+import { create } from 'zustand';
 import { logger } from '../utils/logger';
 import * as notificationApi from '../api/notification';
 
@@ -27,6 +26,28 @@ export interface NotificationState {
   loading: boolean;
   error: string | null;
 }
+
+/** 派生字段：随 notifications 同步维护（Pinia 版为 computed） */
+interface NotificationDerived {
+  hasUnread: boolean;
+  latestNotification: NotificationItem | undefined;
+}
+
+interface NotificationActions {
+  addNotification(notification: NotificationItem): void;
+  fetchNotifications(): Promise<void>;
+  markAsRead(id: string): void;
+  markAllAsRead(): void;
+  clearAll(): void;
+  removeNotification(id: string): void;
+  togglePanel(): void;
+  setPanelOpen(open: boolean): void;
+  setConnected(nextConnected: boolean): void;
+  setCurrentUser(userId: string | null): void;
+  clearUserStorage(): void;
+}
+
+export type NotificationStore = NotificationState & NotificationDerived & NotificationActions;
 
 const MAX_NOTIFICATIONS = 100;
 const STORAGE_PREFIX = 'notif_';
@@ -80,153 +101,152 @@ function removeFromLocalStorage(userId: string): void {
   }
 }
 
-const useNotificationPiniaStore = defineStore('notification', () => {
-  const notifications = ref<NotificationItem[]>([]);
-  const unreadCount = ref(0);
-  const panelOpen = ref(false);
-  const connected = ref(false);
-  const currentUserId = ref<string | null>(null);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  const hasUnread = computed(() => unreadCount.value > 0);
-  const latestNotification = computed(() => notifications.value[0]);
-
-  function syncNotifications(nextNotifications: NotificationItem[]) {
-    notifications.value = nextNotifications.slice(0, MAX_NOTIFICATIONS);
-    unreadCount.value = notifications.value.filter((notification) => !notification.read).length;
-    saveToLocalStorage(currentUserId.value, notifications.value);
-  }
-
-  function addNotification(notification: NotificationItem): void {
-    if (notifications.value.some((item) => item.id === notification.id)) return;
-    syncNotifications([notification, ...notifications.value]);
-  }
-
-  async function fetchNotifications(): Promise<void> {
-    if (!currentUserId.value) return;
-
-    loading.value = true;
-    error.value = null;
-
-    try {
-      const res = await notificationApi.getNotificationList({ limit: MAX_NOTIFICATIONS });
-      notifications.value = res.data.items || [];
-      unreadCount.value =
-        res.data.unreadCount ?? notifications.value.filter((item) => !item.read).length;
-      saveToLocalStorage(currentUserId.value, notifications.value);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch notifications';
-      error.value = message;
-      logger.warn('[NotificationStore] Failed to fetch notifications:', err);
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  function markAsRead(id: string): void {
-    syncNotifications(
-      notifications.value.map((notification) =>
-        notification.id === id ? { ...notification, read: true } : notification,
-      ),
-    );
-    notificationApi.markNotificationRead(id).catch(() => {});
-  }
-
-  function markAllAsRead(): void {
-    syncNotifications(notifications.value.map((notification) => ({ ...notification, read: true })));
-    unreadCount.value = 0;
-    notificationApi.markAllNotificationsRead().catch(() => {});
-  }
-
-  function clearAll(): void {
-    syncNotifications([]);
-    notificationApi.clearNotifications().catch(() => {});
-  }
-
-  function removeNotification(id: string): void {
-    syncNotifications(notifications.value.filter((notification) => notification.id !== id));
-    notificationApi.deleteNotification(id).catch(() => {});
-  }
-
-  function togglePanel(): void {
-    panelOpen.value = !panelOpen.value;
-  }
-
-  function setPanelOpen(open: boolean): void {
-    panelOpen.value = open;
-  }
-
-  function setConnected(nextConnected: boolean): void {
-    connected.value = nextConnected;
-  }
-
-  function setCurrentUser(userId: string | null): void {
-    if (currentUserId.value === userId) return;
-
-    if (currentUserId.value) {
-      saveToLocalStorage(currentUserId.value, notifications.value);
-    }
-
-    currentUserId.value = userId;
-    panelOpen.value = false;
-
-    if (!userId) {
-      notifications.value = [];
-      unreadCount.value = 0;
-      return;
-    }
-
-    const savedNotifications = loadFromLocalStorage(userId);
-    notifications.value = savedNotifications;
-    unreadCount.value = savedNotifications.filter((notification) => !notification.read).length;
-  }
-
-  function clearUserStorage(): void {
-    if (currentUserId.value) {
-      removeFromLocalStorage(currentUserId.value);
-    }
-  }
-
+function withDerived(notifications: NotificationItem[]) {
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
   return {
     notifications,
     unreadCount,
-    panelOpen,
-    connected,
-    currentUserId,
-    loading,
-    error,
-    hasUnread,
-    latestNotification,
-    addNotification,
-    fetchNotifications,
-    markAsRead,
-    markAllAsRead,
-    clearAll,
-    removeNotification,
-    togglePanel,
-    setPanelOpen,
-    setConnected,
-    setCurrentUser,
-    clearUserStorage,
+    hasUnread: unreadCount > 0,
+    latestNotification: notifications[0],
   };
-});
-
-export type NotificationStore = ReturnType<typeof useNotificationPiniaStore>;
-
-interface UseNotificationStore {
-  (): NotificationStore;
-  <T>(selector: (store: NotificationStore) => T): T;
-  getState: () => NotificationStore;
-  setState: (patch: Partial<NotificationState>) => void;
 }
 
-export const useNotificationStore = ((selector?: (store: NotificationStore) => unknown) => {
-  const store = useNotificationPiniaStore();
-  return selector ? selector(store) : store;
-}) as UseNotificationStore;
+/** 截断、重算派生字段并持久化（等价 Pinia 版 syncNotifications） */
+function buildSyncPatch(currentUserId: string | null, nextNotifications: NotificationItem[]) {
+  const notifications = nextNotifications.slice(0, MAX_NOTIFICATIONS);
+  saveToLocalStorage(currentUserId, notifications);
+  return withDerived(notifications);
+}
 
-useNotificationStore.getState = () => useNotificationPiniaStore();
-useNotificationStore.setState = (patch) => {
-  useNotificationPiniaStore().$patch(patch as never);
-};
+export function createInitialNotificationState(): NotificationState & NotificationDerived {
+  return {
+    notifications: [],
+    unreadCount: 0,
+    panelOpen: false,
+    connected: false,
+    currentUserId: null,
+    loading: false,
+    error: null,
+    hasUnread: false,
+    latestNotification: undefined,
+  };
+}
+
+export const useNotificationStore = create<NotificationStore>()((set, get) => ({
+  ...createInitialNotificationState(),
+
+  addNotification(notification) {
+    const { notifications, currentUserId } = get();
+    if (notifications.some((item) => item.id === notification.id)) return;
+    set(buildSyncPatch(currentUserId, [notification, ...notifications]));
+  },
+
+  async fetchNotifications(): Promise<void> {
+    const { currentUserId } = get();
+    if (!currentUserId) return;
+
+    set({ loading: true, error: null });
+
+    try {
+      const res = await notificationApi.getNotificationList({ limit: MAX_NOTIFICATIONS });
+      const notifications = res.data.items || [];
+      const unreadCount = res.data.unreadCount ?? notifications.filter((item) => !item.read).length;
+      saveToLocalStorage(currentUserId, notifications);
+      set({
+        notifications,
+        unreadCount,
+        hasUnread: unreadCount > 0,
+        latestNotification: notifications[0],
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch notifications';
+      set({ error: message });
+      logger.warn('[NotificationStore] Failed to fetch notifications:', err);
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  markAsRead(id) {
+    const { notifications, currentUserId } = get();
+    set(
+      buildSyncPatch(
+        currentUserId,
+        notifications.map((notification) =>
+          notification.id === id ? { ...notification, read: true } : notification,
+        ),
+      ),
+    );
+    notificationApi.markNotificationRead(id).catch(() => {});
+  },
+
+  markAllAsRead() {
+    const { notifications, currentUserId } = get();
+    set(
+      buildSyncPatch(
+        currentUserId,
+        notifications.map((notification) => ({ ...notification, read: true })),
+      ),
+    );
+    notificationApi.markAllNotificationsRead().catch(() => {});
+  },
+
+  clearAll() {
+    set(buildSyncPatch(get().currentUserId, []));
+    notificationApi.clearNotifications().catch(() => {});
+  },
+
+  removeNotification(id) {
+    const { notifications, currentUserId } = get();
+    set(
+      buildSyncPatch(
+        currentUserId,
+        notifications.filter((notification) => notification.id !== id),
+      ),
+    );
+    notificationApi.deleteNotification(id).catch(() => {});
+  },
+
+  togglePanel() {
+    set((state) => ({ panelOpen: !state.panelOpen }));
+  },
+
+  setPanelOpen(open) {
+    set({ panelOpen: open });
+  },
+
+  setConnected(nextConnected) {
+    set({ connected: nextConnected });
+  },
+
+  setCurrentUser(userId) {
+    const { currentUserId, notifications } = get();
+    if (currentUserId === userId) return;
+
+    if (currentUserId) {
+      saveToLocalStorage(currentUserId, notifications);
+    }
+
+    if (!userId) {
+      set({
+        currentUserId: null,
+        panelOpen: false,
+        ...withDerived([]),
+      });
+      return;
+    }
+
+    set({
+      currentUserId: userId,
+      panelOpen: false,
+      ...withDerived(loadFromLocalStorage(userId)),
+    });
+  },
+
+  clearUserStorage() {
+    const { currentUserId } = get();
+    if (currentUserId) {
+      removeFromLocalStorage(currentUserId);
+    }
+  },
+}));

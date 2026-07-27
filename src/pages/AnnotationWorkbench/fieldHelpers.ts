@@ -42,7 +42,3 @@ export function getNumberField(field: TemplateField, key: string, fallback?: num
 export function getBooleanField(field: TemplateField, key: string) {
   return Boolean((field as unknown as Record<string, unknown>)[key]);
 }
-
-export function buildFieldRules(field: TemplateField) {
-  return field.required ? [{ required: true, message: `请填写${field.label}` }] : [];
-}

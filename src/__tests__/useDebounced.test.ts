@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { nextTick, ref } from 'vue';
-import { useDebounced } from '@/composables/useDebounced';
+import { act, renderHook } from '@testing-library/react';
+import { useDebounced } from '@/hooks/useDebounced';
 
 describe('useDebounced', () => {
   beforeEach(() => {
@@ -11,53 +11,64 @@ describe('useDebounced', () => {
     vi.useRealTimers();
   });
 
+  function setup(initialValue: string | undefined, delay: number) {
+    return renderHook(({ value }: { value: string | undefined }) => useDebounced(value, delay), {
+      initialProps: { value: initialValue },
+    });
+  }
+
   it('初始值与 source 一致', () => {
-    const source = ref('init');
-    const debounced = useDebounced(source, 300);
-    expect(debounced.value).toBe('init');
+    const { result } = setup('init', 300);
+    expect(result.current).toBe('init');
   });
 
-  it('延迟到期前保持旧值，到期后更新', async () => {
-    const source = ref('');
-    const debounced = useDebounced(source, 300);
+  it('延迟到期前保持旧值，到期后更新', () => {
+    const { result, rerender } = setup('', 300);
 
-    source.value = 'a';
-    await nextTick();
-    expect(debounced.value).toBe('');
+    rerender({ value: 'a' });
+    expect(result.current).toBe('');
 
-    vi.advanceTimersByTime(299);
-    expect(debounced.value).toBe('');
+    act(() => {
+      vi.advanceTimersByTime(299);
+    });
+    expect(result.current).toBe('');
 
-    vi.advanceTimersByTime(1);
-    expect(debounced.value).toBe('a');
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current).toBe('a');
   });
 
-  it('延迟窗口内连续变更只保留最后一次', async () => {
-    const source = ref('');
-    const debounced = useDebounced(source, 300);
+  it('延迟窗口内连续变更只保留最后一次', () => {
+    const { result, rerender } = setup('', 300);
 
-    source.value = 'a';
-    await nextTick();
-    vi.advanceTimersByTime(200);
+    rerender({ value: 'a' });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
 
-    source.value = 'ab';
-    await nextTick();
-    vi.advanceTimersByTime(200);
+    rerender({ value: 'ab' });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
     // 距离最后一次变更仅 200ms，尚未生效
-    expect(debounced.value).toBe('');
+    expect(result.current).toBe('');
 
-    vi.advanceTimersByTime(100);
-    expect(debounced.value).toBe('ab');
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(result.current).toBe('ab');
   });
 
-  it('支持 getter 作为 source（用于 reactive 对象属性）', async () => {
-    const filters = ref<{ keyword?: string }>({ keyword: 'x' });
-    const debounced = useDebounced(() => filters.value.keyword, 100);
-    expect(debounced.value).toBe('x');
+  it('支持对象属性作为 source（Vue 版 getter 的等价用法）', () => {
+    const filters: { keyword?: string } = { keyword: 'x' };
+    const { result, rerender } = setup(filters.keyword, 100);
+    expect(result.current).toBe('x');
 
-    filters.value = { keyword: 'y' };
-    await nextTick();
-    vi.advanceTimersByTime(100);
-    expect(debounced.value).toBe('y');
+    rerender({ value: 'y' });
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(result.current).toBe('y');
   });
 });
