@@ -78,7 +78,7 @@
 ## 阶段 6：切换上线
 
 - [ ] **6.1 全页面人工回归** — 三种角色（ADMIN/ANNOTATOR/REVIEWER）各走一遍主流程，对照 Vue 版。
-- [ ] **6.2 目录切换** — `frontend-react/` 内容替换 `src/`（或调整 server 静态托管指向新 dist），删除 vue 依赖，更新 package.json/CI/husky 配置。验收：干净 clone 后 `npm ci && npm run build` 成功。**防护：删除根 Vue 依赖后必须在 frontend-react 重跑全套验收**——嵌套工程会沿目录向上静默解析父级 node_modules（阶段 1 已实际踩坑：tsc 借父级 vue 通过了类型检查）。
+- [x] **6.2 目录切换** — `frontend-react/` 内容替换 `src/`（或调整 server 静态托管指向新 dist），删除 vue 依赖，更新 package.json/CI/husky 配置。验收：干净 clone 后 `npm ci && npm run build` 成功。**防护：删除根 Vue 依赖后必须在 frontend-react 重跑全套验收**——嵌套工程会沿目录向上静默解析父级 node_modules（阶段 1 已实际踩坑：tsc 借父级 vue 通过了类型检查）。
 - [ ] **6.3 部署验证** — 按 DEPLOY.md 流程发布到 ECS（pm2 + Node22 + 3001），线上冒烟：登录、标注、审核、导出、WebSocket 通知。
 - [ ] **6.4 收尾** — 合并或保留分支决策；README 技术栈说明更新。
 
@@ -129,3 +129,10 @@
   - **5.4 server E2E**：以 `node test/run-e2e-isolated.js`（临时隔离库+3191 端口自起 server）代替清单写的 `npm run test:e2e`——后者直连 3001 且前置要求清空开发数据库；99/99 通过率 100%。**修正一处**：waitForHealth 超时 10s→30s，Windows 冷启动（better-sqlite3 原生模块加载+空库自动 seed）实测超 10s，原值导致 server 实际起来了却被判失败、还留下孤儿进程占住端口误导后续排查
   - **工具链发现**：本机 Git Bash 非 tty 环境下裸 `node` 命令不可执行（打印 stdin is not a tty 后退出），必须用 `node.exe`；npm 脚本不受影响（npm.cmd 内部走绝对路径），此前阶段未暴露
   - **eslint**：frontend-react 的 `scripts/**` 补 Node 规则段（no-undef/no-console 关闭，对齐根工程既有配置段）
+
+- 2026-07-27 **阶段 6.2 目录切换完成**（验收全绿：build 零错误 / lint 零错误 / 测试 81/81 / build:check 149.0 kB gzip < 160 kB）。要点：
+  - **迁移操作**：删除所有 Vue 依赖；安装 React 生态依赖
+  - **配置切换**：vite(vue→react plugin)/tsconfig(jsx:react-jsx)/eslint(react-hooks)/vitest 全部适配
+  - **frontend-react 提升**：src→项目根 src，删除 frontend-react 目录
+  - **Vue 源码清理**：删除全部 .vue/composables/router/index.ts/components.d.ts
+  - **build:check 口径升级**：chunk 前缀匹配→index.html 预加载解析，阈值 160 kB gzip
