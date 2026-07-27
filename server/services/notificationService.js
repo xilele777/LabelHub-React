@@ -145,12 +145,13 @@ function getVisibleNotificationTypesForUser(user) {
 /**
  * 初始化 Socket.IO 服务器
  * @param {import('http').Server} server - HTTP 服务器实例
+ * @param {object} [corsOptions] - 与 Express 共用的 CORS 配置（含 origin 校验与 credentials）
  */
-function initNotificationService(server) {
+function initNotificationService(server, corsOptions) {
   io = new Server(server, {
-    cors: {
+    cors: corsOptions || {
       origin: (origin, callback) => {
-        // 开发环境允许所有 localhost 来源，生产环境需要严格配置
+        // 未传入配置时的兜底：仅允许本地开发来源
         if (
           !origin ||
           origin.startsWith('http://localhost:') ||

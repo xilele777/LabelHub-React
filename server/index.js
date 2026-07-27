@@ -82,7 +82,8 @@ app.use(compression()); // Gzip/brotli response compression
 app.use(cookieParser()); // Parse cookies for httpOnly token auth
 app.use(securityHeaders); // Basic hardening headers
 app.use(globalLimiter); // API rate limiting
-app.use(cors(buildCorsOptions())); // Allow configured frontend origins
+const corsOptions = buildCorsOptions();
+app.use(cors(corsOptions)); // Allow configured frontend origins
 app.use(responseMiddleware); // Unified response helpers (MUST be before json parser so res.fail is always available)
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
 app.use(authMiddleware); // Attach currentUser to req
@@ -212,7 +213,7 @@ let io = null;
 let timelinessTimer = null;
 
 server.listen(PORT, () => {
-  io = initNotificationService(server);
+  io = initNotificationService(server, corsOptions);
   timelinessTimer = startTimelinessReminderService();
 
   const mode = `${db.isPostgres ? 'PostgreSQL' : 'SQLite'}${process.env.REDIS_URL ? ' + Redis' : ''}`;
