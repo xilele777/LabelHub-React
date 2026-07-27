@@ -1,0 +1,75 @@
+.login-page {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(
+        90deg,
+        rgba(66, 133, 244, 0.12) 0 25%,
+        rgba(234, 67, 53, 0.1) 25% 50%,
+        rgba(251, 188, 4, 0.12) 50% 75%,
+        rgba(52, 168, 83, 0.1) 75% 100%
+      )
+      top / 100% 4px no-repeat,
+    linear-gradient(180deg, #ffffff 0%, #f8fafd 100%);
+}
+
+.login-page::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background-image:
+    linear-gradient(rgba(60, 64, 67, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60, 64, 67, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 72%, transparent 100%);
+}
+
+.login-card {
+  position: relative;
+  width: min(420px, calc(100vw - 48px));
+  background: #fff;
+  border: 1px solid var(--lh-border);
+  border-radius: 8px;
+  box-shadow: var(--lh-shadow-lg);
+}
+
+.login-card .ant-card-body {
+  padding: 30px;
+}
+
+.login-card__header {
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+.login-card__title {
+  margin: 0 0 4px;
+  color: #202124;
+  letter-spacing: 0;
+}
+
+.login-card .ant-input-affix-wrapper {
+  min-height: 42px;
+}
+
+.login-card .ant-btn {
+  height: 42px;
+  font-weight: 500;
+}
+
+.login-card__alert {
+  margin-bottom: 16px;
+}
+
+.login-card__hidden-input {
+  display: none;
+}
+
+.login-card__submit {
+  margin-bottom: 0;
+}

@@ -21,7 +21,7 @@ function securityHeaders(req, res, next) {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
   // ── CSP ──────────────────────────────────────────────
-  // Ant Design Vue 4 uses CSS-in-JS (generates <style> elements dynamically),
+  // Ant Design 5 uses CSS-in-JS (generates <style> elements dynamically),
   // requiring 'unsafe-inline' for style-src. Script-src stays strict.
   // In production, consider replacing 'unsafe-inline' with nonce-based approach.
   const isDev = process.env.NODE_ENV !== 'production';

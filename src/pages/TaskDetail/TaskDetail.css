@@ -1,0 +1,56 @@
+.task-detail-page .page-title {
+  margin: 0;
+}
+
+.task-detail-page .actions {
+  margin-top: 24px;
+}
+
+.task-detail-page .pre-wrap {
+  white-space: pre-wrap;
+}
+
+.task-detail-page .ellipsis-text {
+  display: inline-block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.import-alert,
+.preview-table {
+  margin-top: 16px;
+}
+
+/* ── 分配面板（AnnotationAssignmentPanel / ReviewAssignmentPanel） ── */
+
+.assignment-panel .stats-row {
+  margin-bottom: 8px;
+}
+
+.assignment-panel .mode-hint {
+  margin-bottom: 12px;
+}
+
+.assignment-panel .count-text {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.assignment-panel .items-table {
+  margin-top: 12px;
+}
+
+.assignment-panel .actions {
+  margin-top: 16px;
+}
+
+.assignment-panel .ellipsis-cell {
+  display: inline-block;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,8 +1,6 @@
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
-import vue from '@vitejs/plugin-vue';
-import Components from 'unplugin-vue-components/vite';
-import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers';
+import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 function toNumber(value: string | undefined, fallback: number) {
@@ -17,12 +15,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: env.VITE_APP_BASE || '/',
     plugins: [
-      vue(),
-      // antd v4 使用 CSS-in-JS，无需样式按需引入，importStyle 关闭
-      Components({
-        resolvers: [AntDesignVueResolver({ importStyle: false })],
-        dts: 'src/components.d.ts',
-      }),
+      react(),
       visualizer({
         filename: 'dist/stats.html',
         open: false,
@@ -63,11 +56,13 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
-          // antd/icons 不再强制单 chunk：按需引入后交由 rollup 按页面依赖自然拆分，
-          // 登录等轻页面无需加载完整组件库
+          // 对象形式的 manualChunks 会强制打包所列模块,因此只列已实际引用的包。
+          // react-dom/client 须显式列出：数组项按解析后的模块匹配,只写 'react-dom'
+          // 匹配不到 client 子路径入口,react-dom 实现体会漏进 entry chunk
           manualChunks: {
-            vue: ['vue', 'vue-router', 'pinia'],
+            react: ['react', 'react-dom', 'react-dom/client', 'react-router'],
             request: ['axios'],
+            state: ['zustand'],
             realtime: ['socket.io-client'],
           },
         },

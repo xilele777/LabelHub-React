@@ -1,5 +1,4 @@
-import { computed, ref } from 'vue';
-import { defineStore } from 'pinia';
+import { create } from 'zustand';
 import { logger } from '../utils/logger';
 import {
   DataItemStatus,
@@ -10,6 +9,7 @@ import {
 } from '../types';
 import type { AIReviewResult } from '../types/aiReview';
 import * as annotationApi from '../api/annotation';
+import { isRequestCanceled } from '../api/request';
 import type {
   AvailableItem,
   BatchClaimResult,
@@ -38,6 +38,38 @@ export interface AnnotationState {
   availableItems: AvailableItem[];
   availableLoading: boolean;
 }
+
+/** 派生字段：随 dataItems/currentIndex/conflictInfo/lockInfo 同步维护（Pinia 版为 computed） */
+interface AnnotationDerived {
+  currentItem: DataItem | null;
+  hasConflict: boolean;
+  itemTotal: number;
+}
+
+interface AnnotationActions {
+  fetchDataItems(taskId?: string): Promise<void>;
+  fetchAIReviews(taskId?: string): Promise<void>;
+  setCurrentIndex(index: number): void;
+  saveDraft(id: string, data: Record<string, unknown>, annotator: string): Promise<void>;
+  submitAnnotation(id: string, data: Record<string, unknown>, annotator: string): Promise<void>;
+  approveItem(id: string, reviewer: string): Promise<void>;
+  rejectItem(id: string, reviewer: string, reason: string): Promise<void>;
+  resubmitItem(id: string, data: Record<string, unknown>, annotator: string): Promise<void>;
+  claimItem(id: string): Promise<boolean>;
+  releaseItem(id: string): Promise<void>;
+  releaseAllMyItems(): Promise<void>;
+  resolveConflictWithServer(id: string): void;
+  clearConflict(): void;
+  getAIReviewByDataItemId(dataItemId: string): AIReviewResult | undefined;
+  fetchArchivedItems(taskId?: string): Promise<void>;
+  archiveItem(id: string): Promise<void>;
+  unarchiveItem(id: string): Promise<void>;
+  fetchAvailableItems(taskId?: string): Promise<void>;
+  claimAssignment(id: string): Promise<boolean>;
+  batchClaimAssignments(ids: string[]): Promise<BatchClaimResult | null>;
+}
+
+export type AnnotationStore = AnnotationState & AnnotationDerived & AnnotationActions;
 
 function normalizeSubmitResponse(payload: SubmitWithAIReviewResponse | DataItem): {
   item: DataItem;
@@ -81,397 +113,351 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-const useAnnotationPiniaStore = defineStore('annotation', () => {
-  const dataItems = ref<DataItem[]>([]);
-  const archivedItems = ref<DataItem[]>([]);
-  const aiReviewResults = ref<AIReviewResult[]>([]);
-  const currentIndex = ref(0);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const conflictInfo = ref<ConflictData | null>(null);
-  const lockInfo = ref<LockData | null>(null);
-  const availableItems = ref<AvailableItem[]>([]);
-  const availableLoading = ref(false);
+export function createInitialAnnotationState(): AnnotationState & AnnotationDerived {
+  return {
+    dataItems: [],
+    archivedItems: [],
+    aiReviewResults: [],
+    currentIndex: 0,
+    loading: false,
+    error: null,
+    conflictInfo: null,
+    lockInfo: null,
+    availableItems: [],
+    availableLoading: false,
+    currentItem: null,
+    hasConflict: false,
+    itemTotal: 0,
+  };
+}
 
-  const currentItem = computed(() => dataItems.value[currentIndex.value] ?? null);
-  const hasConflict = computed(() => Boolean(conflictInfo.value || lockInfo.value));
-  const itemTotal = computed(() => dataItems.value.length);
+export const useAnnotationStore = create<AnnotationStore>()((set, get) => {
+  /** 统一入口：合并 patch 并重算全部派生字段（等价 Pinia computed） */
+  function patch(partial: Partial<AnnotationState>): void {
+    const next = { ...get(), ...partial };
+    set({
+      ...partial,
+      currentItem: next.dataItems[next.currentIndex] ?? null,
+      hasConflict: Boolean(next.conflictInfo || next.lockInfo),
+      itemTotal: next.dataItems.length,
+    });
+  }
 
   function replaceDataItem(updatedItem: DataItem, action: string): void {
-    const current = dataItems.value.find((item) => item.id === updatedItem.id);
+    const { dataItems } = get();
+    const current = dataItems.find((item) => item.id === updatedItem.id);
     if (current) {
       assertDataItemStatusTransition(current.status, updatedItem.status, action);
     }
 
-    dataItems.value = dataItems.value.map((item) =>
-      item.id === updatedItem.id ? updatedItem : item,
-    );
+    patch({
+      dataItems: dataItems.map((item) => (item.id === updatedItem.id ? updatedItem : item)),
+    });
   }
 
   function upsertAIReview(dataItemId: string, review?: AIReviewResult): void {
     if (!review) return;
-    aiReviewResults.value = [
-      ...aiReviewResults.value.filter((item) => item.dataItemId !== dataItemId),
-      review,
-    ];
+    patch({
+      aiReviewResults: [
+        ...get().aiReviewResults.filter((item) => item.dataItemId !== dataItemId),
+        review,
+      ],
+    });
   }
 
   // 竞态保护：新请求到达时取消前序在途请求，防止旧数据覆盖新结果
   let dataFetchController: AbortController | null = null;
   let reviewFetchController: AbortController | null = null;
 
-  async function fetchDataItems(taskId?: string): Promise<void> {
-    // 取消前序在途请求
-    dataFetchController?.abort();
-    dataFetchController = new AbortController();
+  return {
+    ...createInitialAnnotationState(),
 
-    loading.value = true;
-    error.value = null;
-    try {
-      const params: Record<string, unknown> = {};
-      if (taskId) params.taskId = taskId;
-      const res = await annotationApi.getAnnotationItemList(params, {
-        signal: dataFetchController.signal,
-      });
-      dataItems.value = res.data.items;
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      error.value = getErrorMessage(err, '获取标注数据失败');
-    } finally {
-      loading.value = false;
-    }
-  }
+    async fetchDataItems(taskId): Promise<void> {
+      // 取消前序在途请求
+      dataFetchController?.abort();
+      dataFetchController = new AbortController();
 
-  async function fetchAIReviews(taskId?: string): Promise<void> {
-    reviewFetchController?.abort();
-    reviewFetchController = new AbortController();
+      patch({ loading: true, error: null });
+      try {
+        const params: Record<string, unknown> = {};
+        if (taskId) params.taskId = taskId;
+        const res = await annotationApi.getAnnotationItemList(params, {
+          signal: dataFetchController.signal,
+        });
+        patch({ dataItems: res.data.items });
+      } catch (err: unknown) {
+        if (isRequestCanceled(err)) {
+          // 取消时不更新 loading，保持调用前状态
+          return;
+        }
+        patch({ error: getErrorMessage(err, '获取标注数据失败') });
+      }
+      // 非取消情况下才重置 loading（catch 未 return 时才到这里）
+      if (!dataFetchController?.signal.aborted) {
+        patch({ loading: false });
+      }
+    },
 
-    error.value = null;
-    try {
-      const res = taskId
-        ? await reviewApi.getReviewsByTaskId(taskId, { signal: reviewFetchController.signal })
-        : await reviewApi.getReviewList({ signal: reviewFetchController.signal });
-      aiReviewResults.value = res.data.items;
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      error.value = getErrorMessage(err, '获取审核数据失败');
-    }
-  }
+    async fetchAIReviews(taskId): Promise<void> {
+      reviewFetchController?.abort();
+      reviewFetchController = new AbortController();
 
-  function setCurrentIndex(index: number): void {
-    currentIndex.value = index;
-    conflictInfo.value = null;
-    lockInfo.value = null;
-  }
+      patch({ error: null });
+      try {
+        const res = taskId
+          ? await reviewApi.getReviewsByTaskId(taskId, { signal: reviewFetchController.signal })
+          : await reviewApi.getReviewList({ signal: reviewFetchController.signal });
+        patch({ aiReviewResults: res.data.items });
+      } catch (err: unknown) {
+        if (isRequestCanceled(err)) return;
+        patch({ error: getErrorMessage(err, '获取审核数据失败') });
+      }
+    },
 
-  async function saveDraft(
-    id: string,
-    data: Record<string, unknown>,
-    _annotator: string,
-  ): Promise<void> {
-    error.value = null;
-    conflictInfo.value = null;
-    try {
-      const current = dataItems.value.find((item) => item.id === id);
-      const version = current?.version ?? 1;
-      const res = await annotationApi.saveDraft(id, data, version);
-      replaceDataItem(res.data, 'saveDraft');
-    } catch (err: unknown) {
-      if (isApiErrorWithData<ConflictData>(err, 409)) {
-        conflictInfo.value = err.data;
-        error.value = null;
+    setCurrentIndex(index): void {
+      patch({ currentIndex: index, conflictInfo: null, lockInfo: null });
+    },
+
+    async saveDraft(id, data, _annotator): Promise<void> {
+      patch({ error: null, conflictInfo: null });
+      try {
+        const current = get().dataItems.find((item) => item.id === id);
+        const version = current?.version ?? 1;
+        const res = await annotationApi.saveDraft(id, data, version);
+        replaceDataItem(res.data, 'saveDraft');
+      } catch (err: unknown) {
+        if (isApiErrorWithData<ConflictData>(err, 409)) {
+          patch({ conflictInfo: err.data, error: null });
+          throw err;
+        }
+        patch({ error: getErrorMessage(err, '保存草稿失败') });
         throw err;
       }
-      error.value = getErrorMessage(err, '保存草稿失败');
-      throw err;
-    }
-  }
+    },
 
-  async function submitAnnotation(
-    id: string,
-    data: Record<string, unknown>,
-    _annotator: string,
-  ): Promise<void> {
-    error.value = null;
-    conflictInfo.value = null;
-    try {
-      const current = dataItems.value.find((item) => item.id === id);
-      const version = current?.version ?? 1;
-      const res = await annotationApi.submitAnnotation(id, data, version);
-      const { item, review } = normalizeSubmitResponse(res.data);
-      replaceDataItem(item, 'submitAnnotation');
-      upsertAIReview(id, review);
-    } catch (err: unknown) {
-      if (isApiErrorWithData<ConflictData>(err, 409)) {
-        conflictInfo.value = err.data;
-        error.value = null;
+    async submitAnnotation(id, data, _annotator): Promise<void> {
+      patch({ error: null, conflictInfo: null });
+      try {
+        const current = get().dataItems.find((item) => item.id === id);
+        const version = current?.version ?? 1;
+        const res = await annotationApi.submitAnnotation(id, data, version);
+        const { item, review } = normalizeSubmitResponse(res.data);
+        replaceDataItem(item, 'submitAnnotation');
+        upsertAIReview(id, review);
+      } catch (err: unknown) {
+        if (isApiErrorWithData<ConflictData>(err, 409)) {
+          patch({ conflictInfo: err.data, error: null });
+          throw err;
+        }
+        patch({ error: getErrorMessage(err, '提交标注失败') });
         throw err;
       }
-      error.value = getErrorMessage(err, '提交标注失败');
-      throw err;
-    }
-  }
+    },
 
-  async function approveItem(id: string, _reviewer: string): Promise<void> {
-    error.value = null;
-    try {
-      const current = dataItems.value.find((item) => item.id === id);
-      const version = current?.version ?? 1;
-      const res = await annotationApi.approveAnnotation(id, version);
-      const updatedItem = res.data;
+    async approveItem(id, _reviewer): Promise<void> {
+      patch({ error: null });
+      try {
+        const current = get().dataItems.find((item) => item.id === id);
+        const version = current?.version ?? 1;
+        const res = await annotationApi.approveAnnotation(id, version);
+        const updatedItem = res.data;
 
-      if (updatedItem.archived) {
-        assertDataItemStatusTransition(
-          current?.status ?? updatedItem.status,
-          updatedItem.status,
-          'approveItem',
-        );
-        dataItems.value = dataItems.value.filter((item) => item.id !== id);
-        archivedItems.value = [updatedItem, ...archivedItems.value];
-      } else {
-        replaceDataItem(updatedItem, 'approveItem');
-      }
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '审核通过失败');
-      throw err;
-    }
-  }
-
-  async function rejectItem(id: string, _reviewer: string, reason: string): Promise<void> {
-    error.value = null;
-    try {
-      const current = dataItems.value.find((item) => item.id === id);
-      const version = current?.version ?? 1;
-      const res = await annotationApi.rejectAnnotation(id, reason, version);
-      replaceDataItem(res.data, 'rejectItem');
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '审核驳回失败');
-      throw err;
-    }
-  }
-
-  async function resubmitItem(
-    id: string,
-    data: Record<string, unknown>,
-    _annotator: string,
-  ): Promise<void> {
-    error.value = null;
-    conflictInfo.value = null;
-    try {
-      const current = dataItems.value.find((item) => item.id === id);
-      const version = current?.version ?? 1;
-      const res = await annotationApi.resubmitAnnotation(id, data, version);
-      const { item, review } = normalizeSubmitResponse(res.data);
-      replaceDataItem(item, 'resubmitItem');
-      upsertAIReview(id, review);
-    } catch (err: unknown) {
-      if (isApiErrorWithData<ConflictData>(err, 409)) {
-        conflictInfo.value = err.data;
-        error.value = null;
+        if (updatedItem.archived) {
+          assertDataItemStatusTransition(
+            current?.status ?? updatedItem.status,
+            updatedItem.status,
+            'approveItem',
+          );
+          const { dataItems, archivedItems } = get();
+          patch({
+            dataItems: dataItems.filter((item) => item.id !== id),
+            archivedItems: [updatedItem, ...archivedItems],
+          });
+        } else {
+          replaceDataItem(updatedItem, 'approveItem');
+        }
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '审核通过失败') });
         throw err;
       }
-      error.value = getErrorMessage(err, '重新提交失败');
-      throw err;
-    }
-  }
+    },
 
-  async function claimItem(id: string): Promise<boolean> {
-    lockInfo.value = null;
-    error.value = null;
-    try {
-      const res = await annotationApi.claimItem(id);
-      replaceDataItem(res.data, 'claimItem');
-      return true;
-    } catch (err: unknown) {
-      if (isApiErrorWithData<LockData>(err, 423)) {
-        lockInfo.value = err.data;
-        error.value = err.message || '该数据正在被他人编辑';
+    async rejectItem(id, _reviewer, reason): Promise<void> {
+      patch({ error: null });
+      try {
+        const current = get().dataItems.find((item) => item.id === id);
+        const version = current?.version ?? 1;
+        const res = await annotationApi.rejectAnnotation(id, reason, version);
+        replaceDataItem(res.data, 'rejectItem');
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '审核驳回失败') });
+        throw err;
+      }
+    },
+
+    async resubmitItem(id, data, _annotator): Promise<void> {
+      patch({ error: null, conflictInfo: null });
+      try {
+        const current = get().dataItems.find((item) => item.id === id);
+        const version = current?.version ?? 1;
+        const res = await annotationApi.resubmitAnnotation(id, data, version);
+        const { item, review } = normalizeSubmitResponse(res.data);
+        replaceDataItem(item, 'resubmitItem');
+        upsertAIReview(id, review);
+      } catch (err: unknown) {
+        if (isApiErrorWithData<ConflictData>(err, 409)) {
+          patch({ conflictInfo: err.data, error: null });
+          throw err;
+        }
+        patch({ error: getErrorMessage(err, '重新提交失败') });
+        throw err;
+      }
+    },
+
+    async claimItem(id): Promise<boolean> {
+      patch({ lockInfo: null, error: null });
+      try {
+        const res = await annotationApi.claimItem(id);
+        replaceDataItem(res.data, 'claimItem');
+        return true;
+      } catch (err: unknown) {
+        if (isApiErrorWithData<LockData>(err, 423)) {
+          patch({ lockInfo: err.data, error: err.message || '该数据正在被他人编辑' });
+          return false;
+        }
+        patch({ error: getErrorMessage(err, '认领失败') });
         return false;
       }
-      error.value = getErrorMessage(err, '认领失败');
-      return false;
-    }
-  }
+    },
 
-  async function releaseItem(id: string): Promise<void> {
-    error.value = null;
-    try {
-      const res = await annotationApi.releaseItem(id);
-      replaceDataItem(res.data, 'releaseItem');
-    } catch (err: unknown) {
-      logger.warn('释放锁失败', getErrorMessage(err, 'unknown error'));
-    }
-  }
+    async releaseItem(id): Promise<void> {
+      patch({ error: null });
+      try {
+        const res = await annotationApi.releaseItem(id);
+        replaceDataItem(res.data, 'releaseItem');
+      } catch (err: unknown) {
+        logger.warn('释放锁失败', getErrorMessage(err, 'unknown error'));
+      }
+    },
 
-  async function releaseAllMyItems(): Promise<void> {
-    try {
-      await annotationApi.releaseAllItems();
-    } catch (err: unknown) {
-      logger.warn('释放所有锁失败:', getErrorMessage(err, 'unknown error'));
-    }
-  }
+    async releaseAllMyItems(): Promise<void> {
+      try {
+        await annotationApi.releaseAllItems();
+      } catch (err: unknown) {
+        logger.warn('释放所有锁失败:', getErrorMessage(err, 'unknown error'));
+      }
+    },
 
-  function resolveConflictWithServer(id: string): void {
-    const conflict = conflictInfo.value;
-    if (conflict?.serverItem) {
-      replaceDataItem(conflict.serverItem, `resolveConflictWithServer:${id}`);
-      conflictInfo.value = null;
-      error.value = null;
-      return;
-    }
+    resolveConflictWithServer(id): void {
+      const conflict = get().conflictInfo;
+      if (conflict?.serverItem) {
+        replaceDataItem(conflict.serverItem, `resolveConflictWithServer:${id}`);
+        patch({ conflictInfo: null, error: null });
+        return;
+      }
 
-    conflictInfo.value = null;
-    error.value = null;
-    void fetchDataItems();
-  }
+      patch({ conflictInfo: null, error: null });
+      void get().fetchDataItems();
+    },
 
-  function clearConflict(): void {
-    conflictInfo.value = null;
-    lockInfo.value = null;
-    error.value = null;
-  }
+    clearConflict(): void {
+      patch({ conflictInfo: null, lockInfo: null, error: null });
+    },
 
-  function getAIReviewByDataItemId(dataItemId: string): AIReviewResult | undefined {
-    return aiReviewResults.value.find((item) => item.dataItemId === dataItemId);
-  }
+    getAIReviewByDataItemId(dataItemId): AIReviewResult | undefined {
+      return get().aiReviewResults.find((item) => item.dataItemId === dataItemId);
+    },
 
-  async function fetchArchivedItems(taskId?: string): Promise<void> {
-    loading.value = true;
-    error.value = null;
-    try {
-      const params: Record<string, unknown> = { archived: 'true' };
-      if (taskId) params.taskId = taskId;
-      const res = await annotationApi.getAnnotationItemList(params);
-      archivedItems.value = res.data.items;
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '获取归档数据失败');
-    } finally {
-      loading.value = false;
-    }
-  }
+    async fetchArchivedItems(taskId): Promise<void> {
+      patch({ loading: true, error: null });
+      try {
+        const params: Record<string, unknown> = { archived: 'true' };
+        if (taskId) params.taskId = taskId;
+        const res = await annotationApi.getAnnotationItemList(params);
+        patch({ archivedItems: res.data.items });
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '获取归档数据失败') });
+      } finally {
+        patch({ loading: false });
+      }
+    },
 
-  async function archiveItem(id: string): Promise<void> {
-    error.value = null;
-    try {
-      const res = await annotationApi.archiveAnnotationItem(id);
-      dataItems.value = dataItems.value.filter((item) => item.id !== id);
-      archivedItems.value = [res.data, ...archivedItems.value];
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '归档失败');
-    }
-  }
+    async archiveItem(id): Promise<void> {
+      patch({ error: null });
+      try {
+        const res = await annotationApi.archiveAnnotationItem(id);
+        const { dataItems, archivedItems } = get();
+        patch({
+          dataItems: dataItems.filter((item) => item.id !== id),
+          archivedItems: [res.data, ...archivedItems],
+        });
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '归档失败') });
+      }
+    },
 
-  async function unarchiveItem(id: string): Promise<void> {
-    error.value = null;
-    try {
-      const res = await annotationApi.unarchiveAnnotationItem(id);
-      archivedItems.value = archivedItems.value.filter((item) => item.id !== id);
-      dataItems.value = [res.data, ...dataItems.value];
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '取消归档失败');
-    }
-  }
+    async unarchiveItem(id): Promise<void> {
+      patch({ error: null });
+      try {
+        const res = await annotationApi.unarchiveAnnotationItem(id);
+        const { dataItems, archivedItems } = get();
+        patch({
+          archivedItems: archivedItems.filter((item) => item.id !== id),
+          dataItems: [res.data, ...dataItems],
+        });
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '取消归档失败') });
+      }
+    },
 
-  async function fetchAvailableItems(taskId?: string): Promise<void> {
-    availableLoading.value = true;
-    error.value = null;
-    try {
-      const params: { taskId?: string } = {};
-      if (taskId) params.taskId = taskId;
-      const res = await annotationApi.getAvailableItems(params);
-      availableItems.value = res.data.items;
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '获取可领取列表失败');
-    } finally {
-      availableLoading.value = false;
-    }
-  }
+    async fetchAvailableItems(taskId): Promise<void> {
+      patch({ availableLoading: true, error: null });
+      try {
+        const params: { taskId?: string } = {};
+        if (taskId) params.taskId = taskId;
+        const res = await annotationApi.getAvailableItems(params);
+        patch({ availableItems: res.data.items });
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '获取可领取列表失败') });
+      } finally {
+        patch({ availableLoading: false });
+      }
+    },
 
-  async function claimAssignment(id: string): Promise<boolean> {
-    error.value = null;
-    try {
-      const res = await annotationApi.claimAssignment(id);
-      dataItems.value = [res.data, ...dataItems.value];
-      availableItems.value = availableItems.value.filter((item) => item.id !== id);
-      return true;
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '领取失败');
-      return false;
-    }
-  }
+    async claimAssignment(id): Promise<boolean> {
+      patch({ error: null });
+      try {
+        const res = await annotationApi.claimAssignment(id);
+        const { dataItems, availableItems } = get();
+        patch({
+          dataItems: [res.data, ...dataItems],
+          availableItems: availableItems.filter((item) => item.id !== id),
+        });
+        return true;
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '领取失败') });
+        return false;
+      }
+    },
 
-  async function batchClaimAssignments(ids: string[]): Promise<BatchClaimResult | null> {
-    error.value = null;
-    try {
-      const res = await annotationApi.batchClaimAssignments(ids);
-      const result = res.data;
-      const claimedIds = new Set(result.claimed.map((item) => item.id));
+    async batchClaimAssignments(ids): Promise<BatchClaimResult | null> {
+      patch({ error: null });
+      try {
+        const res = await annotationApi.batchClaimAssignments(ids);
+        const result = res.data;
+        const claimedIds = new Set(result.claimed.map((item) => item.id));
 
-      dataItems.value = [
-        ...result.claimed,
-        ...dataItems.value.filter((item) => !claimedIds.has(item.id)),
-      ];
-      availableItems.value = availableItems.value.filter((item) => !claimedIds.has(item.id));
+        const { dataItems, availableItems } = get();
+        patch({
+          dataItems: [...result.claimed, ...dataItems.filter((item) => !claimedIds.has(item.id))],
+          availableItems: availableItems.filter((item) => !claimedIds.has(item.id)),
+        });
 
-      return result;
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err, '批量领取失败');
-      return null;
-    }
-  }
-
-  return {
-    dataItems,
-    archivedItems,
-    aiReviewResults,
-    currentIndex,
-    loading,
-    error,
-    conflictInfo,
-    lockInfo,
-    availableItems,
-    availableLoading,
-    currentItem,
-    hasConflict,
-    itemTotal,
-    fetchDataItems,
-    fetchAIReviews,
-    setCurrentIndex,
-    saveDraft,
-    submitAnnotation,
-    approveItem,
-    rejectItem,
-    resubmitItem,
-    claimItem,
-    releaseItem,
-    releaseAllMyItems,
-    resolveConflictWithServer,
-    clearConflict,
-    getAIReviewByDataItemId,
-    fetchArchivedItems,
-    archiveItem,
-    unarchiveItem,
-    fetchAvailableItems,
-    claimAssignment,
-    batchClaimAssignments,
+        return result;
+      } catch (err: unknown) {
+        patch({ error: getErrorMessage(err, '批量领取失败') });
+        return null;
+      }
+    },
   };
 });
-
-export type AnnotationStore = ReturnType<typeof useAnnotationPiniaStore>;
-
-interface UseAnnotationStore {
-  (): AnnotationStore;
-  <T>(selector: (store: AnnotationStore) => T): T;
-  getState: () => AnnotationStore;
-  setState: (patch: Partial<AnnotationState>) => void;
-}
-
-export const useAnnotationStore = ((selector?: (store: AnnotationStore) => unknown) => {
-  const store = useAnnotationPiniaStore();
-  return selector ? selector(store) : store;
-}) as UseAnnotationStore;
-
-useAnnotationStore.getState = () => useAnnotationPiniaStore();
-useAnnotationStore.setState = (patch) => {
-  useAnnotationPiniaStore().$patch(patch as never);
-};

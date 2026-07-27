@@ -1,0 +1,410 @@
+.template-builder {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 92px);
+  min-height: 640px;
+  overflow: hidden;
+}
+
+.template-builder .builder-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 0 2px 10px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--lh-divider);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.template-builder .builder-title {
+  margin: 0;
+}
+
+.template-builder .meta-card {
+  margin-bottom: 10px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.template-builder .meta-form {
+  row-gap: 8px;
+}
+
+.template-builder .meta-input {
+  width: 200px;
+}
+
+.template-builder .meta-desc-input {
+  width: 260px;
+}
+
+.template-builder .meta-select {
+  width: 150px;
+}
+
+.template-builder .builder-main {
+  display: grid;
+  grid-template-columns: minmax(210px, 230px) minmax(440px, 1fr) minmax(320px, 360px);
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--lh-border);
+  border-radius: 8px;
+}
+
+.template-builder .palette-card,
+.template-builder .canvas-card,
+.template-builder .inspector-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.template-builder .palette-card,
+.template-builder .canvas-card {
+  border-right: 1px solid var(--lh-divider);
+}
+
+.template-builder .palette-card .ant-card-body,
+.template-builder .canvas-card .ant-card-body,
+.template-builder .inspector-card .ant-card-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.template-builder .palette-hint {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.template-builder .palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-builder .palette-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  gap: 8px;
+  color: #202124;
+  background: #fff;
+  border: 1px solid var(--lh-divider);
+  border-radius: 6px;
+  cursor: grab;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.template-builder .palette-item:hover {
+  background: #f8fbff;
+  border-color: rgba(26, 115, 232, 0.28);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+.template-builder .palette-icon,
+.tb-drag-overlay-item .palette-icon {
+  color: var(--lh-primary);
+  font-size: 16px;
+}
+
+.template-builder .canvas-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  gap: 8px;
+  padding: 2px;
+}
+
+.template-builder .canvas-list--empty {
+  justify-content: center;
+  background:
+    linear-gradient(rgba(226, 232, 240, 0.72) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(226, 232, 240, 0.72) 1px, transparent 1px);
+  background-color: #fbfcfe;
+  background-size: 18px 18px;
+  border: 1px dashed rgba(148, 163, 184, 0.52);
+  border-radius: 8px;
+}
+
+.template-builder .canvas-list--over {
+  border: 1px dashed var(--lh-primary);
+  border-radius: 8px;
+  background-color: rgba(26, 115, 232, 0.04);
+}
+
+.template-builder .canvas-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--lh-divider);
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.template-builder .canvas-field:hover {
+  background: #fff;
+  border-color: rgba(138, 180, 248, 0.74);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+.template-builder .canvas-field--selected {
+  border-color: var(--lh-primary);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+}
+
+.template-builder .field-drag-handle,
+.tb-drag-overlay-card .field-drag-handle {
+  flex: 0 0 auto;
+  color: #8c8c8c;
+  cursor: grab;
+}
+
+.template-builder .field-type-tag,
+.template-builder .required-tag,
+.tb-drag-overlay-card .field-type-tag {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.template-builder .field-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.template-builder .field-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  color: #202124;
+  font-weight: 600;
+}
+
+.template-builder .field-description,
+.template-builder .field-preview {
+  color: #5f6368;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.template-builder .canvas-empty {
+  display: grid;
+  min-height: 360px;
+  place-items: center;
+}
+
+/* 拖拽视觉（dnd-kit：源元素半透明，浮层跟随指针） */
+.template-builder .drag-ghost {
+  opacity: 0.45;
+  background: var(--lh-primary-soft);
+  border-color: var(--lh-primary);
+}
+
+.template-builder .drag-chosen {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px rgba(26, 115, 232, 0.18);
+}
+
+/* DragOverlay 渲染在 body 下（portal），不能带 .template-builder 前缀 */
+.tb-drag-overlay-item {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 10px;
+  gap: 8px;
+  color: #202124;
+  background: #fff;
+  border: 1px solid rgba(26, 115, 232, 0.4);
+  border-radius: 6px;
+  cursor: grabbing;
+  box-shadow: 0 8px 24px rgba(26, 115, 232, 0.18);
+}
+
+.tb-drag-overlay-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: #202124;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--lh-primary);
+  border-radius: 6px;
+  cursor: grabbing;
+  box-shadow: 0 8px 24px rgba(26, 115, 232, 0.18);
+}
+
+.tb-drag-overlay-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ========== PropertyPanel ========== */
+
+.template-builder .inspector-card .ant-card-body {
+  padding: 0;
+}
+
+.template-builder .inspector-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+  padding-inline: 12px;
+}
+
+.template-builder .inspector-pane {
+  padding: 12px 16px 16px;
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+}
+
+.template-builder .inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.template-builder .inspector-title {
+  margin-bottom: 0;
+}
+
+.template-builder .compact-divider {
+  margin-block: 8px;
+}
+
+.template-builder .config-field {
+  margin-bottom: 10px;
+}
+
+.template-builder .config-field > .ant-typography {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.template-builder .config-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 4px;
+  margin-bottom: 10px;
+}
+
+.template-builder .options-editor {
+  margin-top: 6px;
+}
+
+.template-builder .option-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.template-builder .number-input,
+.template-builder .select-input {
+  width: 100%;
+}
+
+.template-builder .inspector-empty {
+  padding: 40px 16px;
+}
+
+.template-builder .schema-pane {
+  padding: 12px 16px;
+}
+
+.template-builder .schema-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.template-builder .schema-preview {
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #f8fafd;
+  border: 1px solid var(--lh-border);
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 400px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ========== 导入 Modal（portal 渲染在 body 下） ========== */
+
+.tb-import-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tb-json-textarea {
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+}
+
+@media (max-width: 1200px) {
+  .template-builder {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .template-builder .builder-main {
+    grid-template-columns: minmax(210px, 240px) minmax(380px, 1fr);
+  }
+
+  .template-builder .inspector-card {
+    grid-column: 1 / -1;
+    min-height: 460px;
+  }
+}
+
+@media (max-width: 820px) {
+  .template-builder .builder-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .template-builder .builder-main {
+    grid-template-columns: 1fr;
+  }
+
+  .template-builder .meta-input,
+  .template-builder .meta-desc-input,
+  .template-builder .meta-select {
+    width: min(100%, 320px);
+  }
+}

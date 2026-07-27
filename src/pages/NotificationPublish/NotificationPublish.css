@@ -1,0 +1,22 @@
+.notification-page .page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.notification-page .page-icon {
+  color: var(--lh-primary);
+}
+
+.notification-page .form-card {
+  max-width: 820px;
+}
+
+.notification-page .priority-select {
+  width: 180px;
+}
+
+.notification-page .form-actions {
+  align-items: center;
+}

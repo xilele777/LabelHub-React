@@ -1,0 +1,18 @@
+.task-list-page .search-input {
+  width: min(280px, 100%);
+}
+
+.task-list-page .status-select {
+  width: 160px;
+}
+
+.task-list-page .timeliness-tag {
+  margin-inline-end: 0;
+}
+
+@media (max-width: 576px) {
+  .task-list-page .search-input,
+  .task-list-page .status-select {
+    width: 100%;
+  }
+}

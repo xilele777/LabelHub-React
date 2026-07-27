@@ -1,11 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { nextTick, reactive, ref } from 'vue';
+import { renderHook } from '@testing-library/react';
 import {
   clearDraftRecord,
   loadDraft,
   saveDraftRecord,
   useDraftPersistence,
-} from '@/composables/useDraftPersistence';
+  type DraftRecord,
+} from '@/hooks/useDraftPersistence';
 
 describe('draft 存取纯函数', () => {
   beforeEach(() => {
@@ -37,69 +38,92 @@ describe('useDraftPersistence', () => {
     vi.useRealTimers();
   });
 
-  function setup() {
-    const key = ref<string | null>(null);
-    const version = ref<number>(1);
-    const state = reactive<Record<string, unknown>>({});
-    const restoredRecords: unknown[] = [];
-
-    const draft = useDraftPersistence({
-      key: () => key.value,
-      version: () => version.value,
-      snapshot: () => ({ ...state }),
-      restore: (data) => Object.assign(state, data),
-      onRestored: (record) => restoredRecords.push(record),
-      debounceMs: 500,
-    });
-
-    return { key, version, state, restoredRecords, draft };
+  type Form = Record<string, unknown>;
+  interface HookProps {
+    draftKey: string | null;
+    version: number;
   }
 
-  it('切换 key 时恢复版本匹配的草稿', async () => {
-    saveDraftRecord('item1', { version: 1, savedAt: 1, data: { label: '草稿内容' } });
-    const { key, state, restoredRecords } = setup();
+  function setup() {
+    // 外部可变对象模拟表单 state：restore 写回后由 rerender 触发快照更新
+    const state: Form = {};
+    const restoredRecords: DraftRecord<Form>[] = [];
 
-    key.value = 'item1';
-    await nextTick();
+    const hook = renderHook(
+      ({ draftKey, version }: HookProps) =>
+        useDraftPersistence<Form>({
+          key: draftKey,
+          version,
+          snapshot: { ...state },
+          restore: (data) => Object.assign(state, data),
+          onRestored: (record) => restoredRecords.push(record),
+          debounceMs: 500,
+        }),
+      { initialProps: { draftKey: null, version: 1 } as HookProps },
+    );
+
+    return { ...hook, state, restoredRecords };
+  }
+
+  it('切换 key 时恢复版本匹配的草稿', () => {
+    saveDraftRecord('item1', { version: 1, savedAt: 1, data: { label: '草稿内容' } });
+    const { rerender, state, restoredRecords } = setup();
+
+    rerender({ draftKey: 'item1', version: 1 });
 
     expect(state.label).toBe('草稿内容');
     expect(restoredRecords).toHaveLength(1);
   });
 
-  it('版本不匹配的过期草稿被清理且不恢复', async () => {
+  it('版本不匹配的过期草稿被清理且不恢复', () => {
     saveDraftRecord('item2', { version: 99, savedAt: 1, data: { label: '过期草稿' } });
-    const { key, state } = setup();
+    const { rerender, state } = setup();
 
-    key.value = 'item2';
-    await nextTick();
+    rerender({ draftKey: 'item2', version: 1 });
 
     expect(state.label).toBeUndefined();
     expect(loadDraft('item2')).toBeNull();
   });
 
-  it('表单变化防抖写入本地草稿', async () => {
-    const { key, state } = setup();
-    key.value = 'item3';
-    await nextTick();
+  it('表单变化防抖写入本地草稿', () => {
+    const { rerender, state } = setup();
+    rerender({ draftKey: 'item3', version: 1 });
 
     state.label = '输入中';
-    await nextTick();
+    rerender({ draftKey: 'item3', version: 1 });
     expect(loadDraft('item3')).toBeNull();
 
     vi.advanceTimersByTime(500);
     expect(loadDraft<{ label: string }>('item3')?.data.label).toBe('输入中');
   });
 
-  it('clear 清理当前草稿并取消未落盘的定时器', async () => {
-    const { key, state, draft } = setup();
-    key.value = 'item4';
-    await nextTick();
+  it('clear 清理当前草稿并取消未落盘的定时器', () => {
+    const { rerender, result, state } = setup();
+    rerender({ draftKey: 'item4', version: 1 });
 
     state.label = 'x';
-    await nextTick();
-    draft.clear();
+    rerender({ draftKey: 'item4', version: 1 });
+    result.current.clear();
     vi.advanceTimersByTime(1000);
 
     expect(loadDraft('item4')).toBeNull();
+  });
+
+  it('clear 之后的下一次表单变化仍会防抖保存（基线不回退）', () => {
+    const { rerender, result, state } = setup();
+    rerender({ draftKey: 'item5', version: 1 });
+
+    state.label = 'a';
+    rerender({ draftKey: 'item5', version: 1 });
+    vi.advanceTimersByTime(500);
+    expect(loadDraft('item5')).not.toBeNull();
+
+    result.current.clear();
+    expect(loadDraft('item5')).toBeNull();
+
+    state.label = 'b';
+    rerender({ draftKey: 'item5', version: 1 });
+    vi.advanceTimersByTime(500);
+    expect(loadDraft<{ label: string }>('item5')?.data.label).toBe('b');
   });
 });

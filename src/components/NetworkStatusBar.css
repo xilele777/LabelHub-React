@@ -1,0 +1,49 @@
+.network-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  transition: background-color var(--lh-motion-base) var(--lh-ease-standard);
+  animation: network-bar-enter var(--lh-motion-base) var(--lh-ease-standard);
+}
+
+.network-bar--offline,
+.network-bar--reconnecting {
+  color: #fff;
+  background: #d93025;
+}
+
+.network-bar--online {
+  color: #fff;
+  background: #188038;
+}
+
+.network-bar__icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.network-bar__text {
+  white-space: nowrap;
+}
+
+/* Vue Transition → CSS 进入动画（离场动画省略：条挂载/卸载即隐即现） */
+@keyframes network-bar-enter {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

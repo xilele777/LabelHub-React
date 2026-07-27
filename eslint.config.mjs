@@ -1,7 +1,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import pluginVue from 'eslint-plugin-vue';
-import vueParser from 'vue-eslint-parser';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
   // ── Global ignores ──────────────────────────────────────
@@ -16,7 +16,6 @@ export default tseslint.config(
       'logs/**',
       'coverage/**',
       '*.md',
-      'src/components.d.ts',
     ],
   },
 
@@ -24,26 +23,17 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
-  // ── Frontend (Vue + TS) ─────────────────────────────────
-  ...pluginVue.configs['flat/recommended'],
+  // ── Frontend (React + TS) ───────────────────────────────
   {
-    files: ['src/**/*.{ts,vue}', '*.config.{ts,js}'],
-    languageOptions: {
-      parser: vueParser,
-      parserOptions: {
-        parser: tseslint.parser,
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-      },
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
     },
     rules: {
-      'vue/multi-word-component-names': 'off',
-      'vue/no-v-html': 'warn',
-      // 以下规则与 Prettier 冲突，关闭避免 CI 警告溢出
-      'vue/max-attributes-per-line': 'off',
-      'vue/singleline-html-element-content-newline': 'off',
-      'vue/html-indent': 'off',
-      'vue/html-self-closing': 'off',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-refresh/only-export-components': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'error',
       'no-console': 'error',

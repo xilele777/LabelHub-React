@@ -1,14 +1,28 @@
-import { computed, ref } from 'vue';
-import { defineStore } from 'pinia';
+import { create } from 'zustand';
 import type { UserInfo } from '../types';
-import { AUTH_EXPIRED_EVENT, resetUnauthorizedRedirect } from '../api/request';
+import { AUTH_EXPIRED_EVENT } from '../api/authEvents';
+import { resetUnauthorizedRedirect } from '../api/request';
+import { useListCacheStore } from './useListCacheStore';
 
 export interface AuthState {
   user: UserInfo | null;
   token: string | null;
   loading: boolean;
   error: string | null;
+  /** 派生字段：由 setSession/clearSession/setUser 同步维护 */
+  isAuthenticated: boolean;
+  role: UserInfo['role'] | null;
 }
+
+interface AuthActions {
+  setSession(payload: { token: string; user: UserInfo }): void;
+  clearSession(message?: string): void;
+  setUser(nextUser: UserInfo | null): void;
+  login(username: string, password: string): Promise<UserInfo | null>;
+  logout(): Promise<void>;
+}
+
+export type AuthStore = AuthState & AuthActions;
 
 const USER_KEY = 'user';
 const TOKEN_KEY = 'token';
@@ -38,72 +52,86 @@ function loadPersistedUser(): UserInfo | null {
   }
 }
 
-const useAuthPiniaStore = defineStore('auth', () => {
-  const storage = getStorage();
-  const user = ref<UserInfo | null>(loadPersistedUser());
-  const token = ref<string | null>(storage?.getItem(TOKEN_KEY) ?? null);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
+function derive(user: UserInfo | null, token: string | null) {
+  return {
+    isAuthenticated: Boolean(token && user),
+    role: user?.role ?? null,
+  };
+}
 
-  const isAuthenticated = computed(() => Boolean(token.value && user.value));
-  const role = computed(() => user.value?.role ?? null);
+/** 从 localStorage 恢复初始状态；测试中用于模拟 store 重新初始化 */
+export function createInitialAuthState(): AuthState {
+  const user = loadPersistedUser();
+  const token = getStorage()?.getItem(TOKEN_KEY) ?? null;
+  return { user, token, loading: false, error: null, ...derive(user, token) };
+}
 
-  function setSession(payload: { token: string; user: UserInfo }) {
-    token.value = payload.token;
-    user.value = payload.user;
-    error.value = null;
+export const useAuthStore = create<AuthStore>()((set, get) => ({
+  ...createInitialAuthState(),
+
+  setSession(payload) {
     resetUnauthorizedRedirect();
 
     const storage = getStorage();
     storage?.setItem(USER_KEY, JSON.stringify(payload.user));
     storage?.setItem(TOKEN_KEY, payload.token);
-  }
 
-  function clearSession(message?: string) {
-    token.value = null;
-    user.value = null;
-    loading.value = false;
-    error.value = message ?? null;
+    set({
+      user: payload.user,
+      token: payload.token,
+      error: null,
+      ...derive(payload.user, payload.token),
+    });
+  },
 
+  clearSession(message) {
     const storage = getStorage();
     storage?.removeItem(USER_KEY);
     storage?.removeItem(TOKEN_KEY);
-  }
 
-  function setUser(nextUser: UserInfo | null) {
-    user.value = nextUser;
+    // 列表页筛选缓存是会话级的，登出/登录过期后不应残留给下一个用户
+    useListCacheStore.getState().resetListCache();
 
+    set({
+      user: null,
+      token: null,
+      loading: false,
+      error: message ?? null,
+      ...derive(null, null),
+    });
+  },
+
+  setUser(nextUser) {
     const storage = getStorage();
-    if (!storage) return;
-
-    if (nextUser) {
-      storage.setItem(USER_KEY, JSON.stringify(nextUser));
-    } else {
-      storage.removeItem(USER_KEY);
+    if (storage) {
+      if (nextUser) {
+        storage.setItem(USER_KEY, JSON.stringify(nextUser));
+      } else {
+        storage.removeItem(USER_KEY);
+      }
     }
-  }
 
-  async function login(username: string, password: string): Promise<UserInfo | null> {
-    loading.value = true;
-    error.value = null;
+    set((state) => ({ user: nextUser, ...derive(nextUser, state.token) }));
+  },
+
+  async login(username, password) {
+    set({ loading: true, error: null });
 
     try {
       const { loginApi } = await import('../api/auth');
       const res = await loginApi({ username, password });
-      setSession(res.data);
-      loading.value = false;
+      get().setSession(res.data);
+      set({ loading: false });
       return res.data.user;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '登录失败';
-      loading.value = false;
-      error.value = message;
+      set({ loading: false, error: message });
       return null;
     }
-  }
+  },
 
-  async function logout(): Promise<void> {
-    loading.value = true;
-    error.value = null;
+  async logout() {
+    set({ loading: true, error: null });
 
     try {
       const { releaseAllItems } = await import('../api/annotation');
@@ -112,45 +140,12 @@ const useAuthPiniaStore = defineStore('auth', () => {
       // Releasing item locks should not block logout.
     }
 
-    clearSession();
-  }
-
-  return {
-    user,
-    token,
-    loading,
-    error,
-    isAuthenticated,
-    role,
-    login,
-    logout,
-    setUser,
-    setSession,
-    clearSession,
-  };
-});
-
-export type AuthStore = ReturnType<typeof useAuthPiniaStore>;
-
-interface UseAuthStore {
-  (): AuthStore;
-  <T>(selector: (store: AuthStore) => T): T;
-  getState: () => AuthStore;
-  setState: (patch: Partial<AuthState>) => void;
-}
-
-export const useAuthStore = ((selector?: (store: AuthStore) => unknown) => {
-  const store = useAuthPiniaStore();
-  return selector ? selector(store) : store;
-}) as UseAuthStore;
-
-useAuthStore.getState = () => useAuthPiniaStore();
-useAuthStore.setState = (patch) => {
-  useAuthPiniaStore().$patch(patch as never);
-};
+    get().clearSession();
+  },
+}));
 
 if (typeof window !== 'undefined') {
   window.addEventListener(AUTH_EXPIRED_EVENT, () => {
-    useAuthStore().clearSession('登录已过期，请重新登录');
+    useAuthStore.getState().clearSession('登录已过期，请重新登录');
   });
 }
