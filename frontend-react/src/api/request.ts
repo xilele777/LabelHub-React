@@ -9,6 +9,11 @@ import { AUTH_EXPIRED_EVENT } from './authEvents';
 
 export { AUTH_EXPIRED_EVENT };
 
+/** 判断错误是否为 AbortController 取消导致（用于 catch 分支跳过透传） */
+export function isRequestCanceled(error: unknown): boolean {
+  return axios.isCancel(error) || (error instanceof DOMException && error.name === 'AbortError');
+}
+
 export interface ApiResponse<T = unknown> {
   code: number;
   message: string;
@@ -179,6 +184,11 @@ instance.interceptors.response.use(
       const waitMs = baseDelay * Math.pow(2, retryCount) * jitter;
       await delay(waitMs);
       return instance.request(config!);
+    }
+
+    // 取消错误保持原样抛出，不包装为 ApiError（让调用方 catch 可区分取消）
+    if (isRequestCanceled(error)) {
+      return Promise.reject(error);
     }
 
     const status = error.response?.status;

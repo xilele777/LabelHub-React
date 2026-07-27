@@ -83,6 +83,10 @@ export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
   // ── 恢复：key 变化（含首次挂载）时尝试恢复版本匹配的草稿 ──
   useEffect(() => {
     if (!key) return;
+    // key 变化时重置基线，避免将切换后的首次表单重置误判为用户修改
+    hasBaselineRef.current = false;
+    lastSnapshotRef.current = null;
+
     const record = loadDraft<T>(key);
     if (!record) return;
     if (record.version !== latestRef.current.version) {

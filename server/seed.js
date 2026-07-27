@@ -1572,7 +1572,18 @@ const runSeed = db._db.transaction(() => {
           reason: null,
           timestamp: '2026-05-18T09:00:00Z',
         },
+        {
+          id: 'h037b',
+          operator: 'r',
+          actionType: 'archive',
+          fromStatus: 'reviewed',
+          toStatus: 'reviewed',
+          reason: 'Review approved; automatically archived',
+          timestamp: '2026-05-18T09:00:00Z',
+        },
       ],
+      archived: true,
+      archivedAt: '2026-05-18T09:00:00Z',
     },
     {
       id: 'd202',
@@ -1947,11 +1958,11 @@ const runSeed = db._db.transaction(() => {
     if (item.lockedBy === undefined) patches.lockedBy = null;
     if (item.lockedAt === undefined) patches.lockedAt = null;
     if (item.version === undefined) patches.version = 1;
+    // archived / archivedAt：仅当字段未定义（undefined）时才初始化，
+    // 已有值（包括 false / null）说明显式配置过，不再覆盖
     if (item.archived === undefined) {
-      // Auto-archive reviewed items that went through the full approve flow
-      patches.archived = item.status === 'reviewed';
-      patches.archivedAt =
-        item.status === 'reviewed' ? item.reviewedAt || item.archivedAt || null : null;
+      patches.archived = false;
+      patches.archivedAt = null;
     }
     if (Object.keys(patches).length > 0) {
       db.updateById('annotation-items', item.id, patches);

@@ -9,6 +9,7 @@ import {
 } from '../types';
 import type { AIReviewResult } from '../types/aiReview';
 import * as annotationApi from '../api/annotation';
+import { isRequestCanceled } from '../api/request';
 import type {
   AvailableItem,
   BatchClaimResult,
@@ -185,9 +186,14 @@ export const useAnnotationStore = create<AnnotationStore>()((set, get) => {
         });
         patch({ dataItems: res.data.items });
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (isRequestCanceled(err)) {
+          // 取消时不更新 loading，保持调用前状态
+          return;
+        }
         patch({ error: getErrorMessage(err, '获取标注数据失败') });
-      } finally {
+      }
+      // 非取消情况下才重置 loading（catch 未 return 时才到这里）
+      if (!dataFetchController?.signal.aborted) {
         patch({ loading: false });
       }
     },
@@ -203,7 +209,7 @@ export const useAnnotationStore = create<AnnotationStore>()((set, get) => {
           : await reviewApi.getReviewList({ signal: reviewFetchController.signal });
         patch({ aiReviewResults: res.data.items });
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (isRequestCanceled(err)) return;
         patch({ error: getErrorMessage(err, '获取审核数据失败') });
       }
     },
