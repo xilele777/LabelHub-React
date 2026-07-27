@@ -146,7 +146,7 @@
   - **分支决策**：react-migration 合并进 main——迁移验收全绿 + 人工回归完成，生产部署从 main 拉取；分支暂留作里程碑标记，Vue 版完整历史可经 git 回溯（切换点 b88c061 的父提交）
 
 - 2026-07-27 **阶段 6.3 部署验证完成，迁移全部阶段（0-6）收官**。要点：
-  - **双仓库链路发现**：服务器 `/root/LabelHub` 的 origin 是 `xilele777/LabelHub.git`（Vue 主仓库），而迁移工作推的是 `xilele777/LabelHub-React.git`——两仓库同源（服务器所在 73e1541 与 LabelHub.git 远端头 c8b9ecf 均为本地 main 祖先），将 main 快进推送 LabelHub.git（c8b9ecf..f40b267）后服务器走 DEPLOY.md 标准 `git pull`，零改动。**此后发版须同时推两个仓库**（已记入 DEPLOY.md）
+  - **双仓库链路发现**：服务器 `/root/LabelHub` 的 origin 是 `xilele777/LabelHub.git`（Vue 主仓库），而迁移工作推的是 `xilele777/LabelHub-React.git`——两仓库同源（服务器所在 73e1541 与 LabelHub.git 远端头 c8b9ecf 均为本地 main 祖先），将 main 快进推送 LabelHub.git（c8b9ecf..f40b267）后服务器走 DEPLOY.md 标准 `git pull`，零改动。（同日稍后收拢为单仓库：LabelHub-React 转公开，服务器 origin 已 `set-url` 切至 LabelHub-React.git 并验证匿名 pull，此后只发新仓库，老仓库封存——详见 DEPLOY.md）
   - **SSH 免密打通**：服务器此前仅密码认证（无法自动化），本机 ed25519 公钥装入 authorized_keys；注意 PowerShell 管道写 authorized_keys 会带 CRLF 使 key 失效，改用远端 `echo '<pubkey>' >>` + `tr -d '\r'` 的自包含命令
   - **服务器构建**：Node v22.23.1，`npm ci`（官方 registry）+ `vite build` 34.38s 一次通过，1.6G 内存 + 4G swap 未触顶；产物 chunk hash 与本地构建逐一一致（index-gvhu6q_a / react-CzBn9Y3q / request-DhXgJQ-f / state-BtYoS8M8）
   - **线上冒烟（pm2 restart --update-env 后）**：health 200 且生产数据完好（3 用户/12 任务/9 模板/19 标注项/11 审核）；三角色 o/a/r 登录均返回 token；鉴权任务列表 200、无鉴权 401；socket.io 握手（服务器本机 + 公网）返回 sid 并支持 websocket upgrade；公网首页/入口 JS/react chunk 均 200 且字节数与本地产物一致；SPA 直达路由 /login 回退 200。标注/审核/导出的浏览器端交互由 6.1 人工回归覆盖，后端业务流由 server E2E 99/99 覆盖
