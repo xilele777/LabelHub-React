@@ -18,7 +18,7 @@ LabelHub 当前生产部署为阿里云 ECS 单机（Ubuntu，1.6G 内存 + 4G s
 2. 前端静态资源由 Nginx 托管，具备正确的缓存策略与压缩。
 3. `git push main` 后自动完成「质量门禁 → 部署 → 健康检查 →（失败）回滚」全流程。
 4. 服务器不再承担前端构建负担。
-5. 消除 `ecosystem.config.js` 与线上实际配置的漂移。
+5. 消除 `ecosystem.config.cjs` 与线上实际配置的漂移。
 
 ## 3. 非目标（明确不做，及理由）
 
@@ -52,7 +52,7 @@ LabelHub 当前生产部署为阿里云 ECS 单机（Ubuntu，1.6G 内存 + 4G s
 │   │   ├── dist/
 │   │   ├── server/
 │   │   │   └── data -> /srv/labelhub/shared/data
-│   │   ├── ecosystem.config.js
+│   │   ├── ecosystem.config.cjs
 │   │   └── .env -> /srv/labelhub/shared/.env
 │   └── 20260813-9f8e7d6/          # 保留最近 5 个用于回滚
 ├── current -> releases/20260814-a1b2c3d
@@ -132,7 +132,7 @@ location /socket.io/ {
 
 ### 5.4 真实 IP 透传（必须与后端联动）
 
-Nginx 传 `X-Forwarded-For` / `X-Forwarded-Proto`，同时后端必须设置 `TRUST_PROXY=true`（非密钥项，由 `ecosystem.config.js` 的 `env` 块提供）。
+Nginx 传 `X-Forwarded-For` / `X-Forwarded-Proto`，同时后端必须设置 `TRUST_PROXY=true`（非密钥项，由 `ecosystem.config.cjs` 的 `env` 块提供）。
 
 [server/index.js:45](../../../server/index.js#L45) 是 `app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false)`，默认关闭。若只加 Nginx 而不开这个开关，`globalLimiter` 看到的每个请求来源都是 `127.0.0.1`，单个用户触发登录限流会导致全站被锁。**这两项必须同时生效，缺一即为线上故障。**
 
@@ -169,11 +169,11 @@ CI 的 `build` job 已构建并 `upload-artifact`，服务器重复构建是纯�
 
 1. `download-artifact` 取 `dist/`
 2. 计算 release 名：`$(date +%Y%m%d)-${GITHUB_SHA::7}`
-3. rsync `dist/`、`server/`（排除 `node_modules`、`data`、`.env`）、`ecosystem.config.js` 到 `releases/<name>/`
+3. rsync `dist/`、`server/`（排除 `node_modules`、`data`、`.env`）、`ecosystem.config.cjs` 到 `releases/<name>/`
 4. 在 release 内建立软链：`server/data -> shared/data`、`.env -> shared/.env`
 5. `cd releases/<name>/server && npm ci --omit=dev`
 6. 原子切换：`ln -sfn releases/<name> current.tmp && mv -T current.tmp current`
-7. 重建进程：`pm2 delete labelhub || true` → `pm2 start /srv/labelhub/current/ecosystem.config.js` → `pm2 save`
+7. 重建进程：`pm2 delete labelhub || true` → `pm2 start /srv/labelhub/current/ecosystem.config.cjs` → `pm2 save`
 8. 健康检查（§6.5）
 9. 清理：保留最近 5 个 release，其余删除
 
@@ -216,7 +216,9 @@ GitHub 托管 runner 的出口 IP 落在 Azure 全球 IP 段（数千个 CIDR �
 
 ## 7. 配置漂移收口
 
-[ecosystem.config.js](../../../ecosystem.config.js) 当前声明 `exec_mode: 'cluster'`、`instances: 'max'`、`DB_TYPE: 'postgres'`，与线上实际（fork 单进程 + SQLite）完全不符。该文件当前是错误的：任何人执行 `pm2 start ecosystem.config.js` 都会把生产切向一个不存在的 Postgres。
+原 `ecosystem.config.js` 声明 `exec_mode: 'cluster'`、`instances: 'max'`、`DB_TYPE: 'postgres'`，与线上实际（fork 单进程 + SQLite）完全不符。该文件当时是错误的：任何人执行 `pm2 start ecosystem.config.js` 都会把生产切向一个不存在的 Postgres。
+
+**同时重命名为 [`ecosystem.config.cjs`](../../../ecosystem.config.cjs)**：根 `package.json` 声明了 `"type": "module"`，根目录下的 `.js` 会被当作 ESM 解析，其中的 `module.exports` 不生效——实测 `require('./ecosystem.config.js')` 返回空对象 `{}`，pm2 用它启动将拿不到任何配置。该缺陷此前未暴露，仅因线上一直是 `pm2 start server/index.js` 而从未使用过这个文件。项目内 `scripts/check-bundle-size.cjs` 已是同一约定。
 
 修改为与线上一致：
 
@@ -248,7 +250,7 @@ GitHub 托管 runner 的出口 IP 落在 Azure 全球 IP 段（数千个 CIDR �
 
 CORS 目前未表现为故障，是因为前后端同源（同一个 `:3001`），浏览器不发起跨域校验；该错误配置一直被同源掩盖着。
 
-**修复方式：Node 原生 `--env-file`，不引入 `dotenv`。** 服务器 Node v22.23.1 已实测支持（同时支持 `--env-file-if-exists`）。在 `ecosystem.config.js` 的 `node_args` 中加 `--env-file=.env`，配合 `cwd` 指向 release 根目录，即读到 `.env -> shared/.env`。
+**修复方式：Node 原生 `--env-file`，不引入 `dotenv`。** 服务器 Node v22.23.1 已实测支持（同时支持 `--env-file-if-exists`）。在 `ecosystem.config.cjs` 的 `node_args` 中加 `--env-file=.env`，配合 `cwd` 指向 release 根目录，即读到 `.env -> shared/.env`。
 
 选它而非 `dotenv` 的理由：零新依赖；无需改动 `server/index.js` 的 require 顺序；密钥不进 `env` 块，因而不会被 `pm2 save` 明文写入 `~/.pm2/dump.pm2`；`pm2 restart` 天然重新读文件。
 
@@ -335,7 +337,7 @@ CORS_ORIGIN=http://<公网IP>:3001
 4. 向 main 推送一次提交，CD 自动完成部署，全程无人工介入
 5. 人为制造一次健康检查失败，验证自动回滚生效且 job 变红
 6. 服务器上不存在前端 `node_modules`
-7. `ecosystem.config.js` 与线上运行配置一致
+7. `ecosystem.config.cjs` 与线上运行配置一致
 8. `sshd -T | grep passwordauthentication` 输出 `no`，fail2ban 处于 active
 9. pm2 进程以 `deploy` 用户运行，`pm2-deploy.service` 已 enabled；`deploy` 无 root 权限（仅 `systemctl reload nginx` 一项 sudo）
 10. 数据迁移后七张表行数与 §4.3 基线完全一致

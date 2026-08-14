@@ -41,6 +41,9 @@ const db = require('./store/db');
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
+// 生产下设为 127.0.0.1，只监听回环、公网流量一律经 Nginx；
+// 默认 0.0.0.0 以免影响本地开发与 CI 的 E2E
+const HOST = process.env.HOST || '0.0.0.0';
 
 app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
 
@@ -212,12 +215,12 @@ server.setTimeout(30_000, (socket) => {
 let io = null;
 let timelinessTimer = null;
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   io = initNotificationService(server, corsOptions);
   timelinessTimer = startTimelinessReminderService();
 
   const mode = `${db.isPostgres ? 'PostgreSQL' : 'SQLite'}${process.env.REDIS_URL ? ' + Redis' : ''}`;
-  logger.info({ port: PORT, mode }, 'LabelHub Backend Server started');
+  logger.info({ host: HOST, port: PORT, mode }, 'LabelHub Backend Server started');
 
   // PM2: 通知进程管理器服务已就绪
   if (typeof process.send === 'function') {
