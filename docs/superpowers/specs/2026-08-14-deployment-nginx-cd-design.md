@@ -67,7 +67,30 @@ Nginx 的 `root` 指向 `/srv/labelhub/current/dist`。发布时切换 `current`
 
 Nginx 默认以 `www-data` 用户运行，而 `/root` 的权限是 `700`，`www-data` 无法穿越该目录，静态资源会全部 403。可选解法中：放宽 `/root` 权限损害安全边界；让 Nginx 以 root 运行更差。因此选择迁移到 `/srv/labelhub`——同时也更符合 FHS 规范。
 
-迁移涉及 SQLite 数据文件搬迁，是本次实施中风险最高的一步，必须在切换前完成备份（见 §9）。
+迁移涉及 SQLite 数据文件搬迁，是本次实施中风险最高的一步，必须在切换前完成备份（见 §4.3）。
+
+### 4.3 SQLite 迁移必须是 WAL 感知的
+
+线上实测（2026-08-14）：`labelhub.db` 仅 208KB，而 `labelhub.db-wal` 达 **4.1MB**——数据库运行在 `journal_mode=wal` 且长期未 checkpoint，绝大部分数据还在 WAL 中尚未合并进主库。
+
+因此 **`cp server/data/*.db` 是错误的备份方式**：该通配符只匹配 `.db`，不含 `-wal` / `-shm`，照此备份或迁移会丢失几乎全部数据。
+
+正确做法二选一：
+
+1. **停服务后整目录复制**——`pm2 stop` 后连同 `.db`、`.db-wal`、`.db-shm` 一起复制（三者必须同时、同一时刻）；
+2. **在线一致性备份**——用 better-sqlite3 的 `db.backup()` 或 `VACUUM INTO` 生成单文件快照，自动合并 WAL（服务器未安装 `sqlite3` CLI，走 Node 侧 API）。
+
+迁移后验证以行数为准，基线（2026-08-14 实测）：
+
+| 表               | 行数 |
+| ---------------- | ---- |
+| users            | 3    |
+| tasks            | 12   |
+| templates        | 9    |
+| reviews          | 11   |
+| annotation_items | 19   |
+| notifications    | 7    |
+| web_vitals       | 143  |
 
 ## 5. Nginx 网关设计
 
@@ -178,6 +201,19 @@ GitHub Secrets：`DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`。
 
 `.env` 仅存在于服务器 `shared/` 目录，不进仓库、不进 CI、不经 artifact。
 
+### 6.7 服务器侧访问控制（22 端口开放的前提）
+
+GitHub 托管 runner 的出口 IP 落在 Azure 全球 IP 段（数千个 CIDR 且随时变化），阿里云安全组单组规则上限 200 条，**白名单方案不可行**。已排除的替代路径：自托管 runner（LabelHub-React 是公开仓库，GitHub 官方明确警告 fork PR 可在自托管 runner 上执行任意代码）、Tailscale 组网（引入外部依赖与常驻进程，复杂度不匹配）。
+
+因此采用：**安全组 22 放行 `0.0.0.0/0`，配套四项硬化**。四项必须在放开安全组**之前**完成——线上实测当前 `PasswordAuthentication yes`，22 一旦暴露即刻面临密码爆破：
+
+1. `PasswordAuthentication no`——只留公钥认证
+2. 新建非 root 的 `deploy` 用户承载 CD 与 pm2 进程，`/srv/labelhub` 属主为 `deploy`
+3. `deploy` 通过 sudoers 白名单仅可执行 `systemctl reload nginx`，无其他 sudo 权限
+4. 安装 fail2ban（约 25MB 常驻）拦截爆破
+
+`PermitRootLogin` 保留 `prohibit-password`（禁密码、留公钥），以保住人工运维通道——CD 密钥泄露时可用 root 通道处置，反之亦然。
+
 ## 7. 配置漂移收口
 
 [ecosystem.config.js](../../../ecosystem.config.js) 当前声明 `exec_mode: 'cluster'`、`instances: 'max'`、`DB_TYPE: 'postgres'`，与线上实际（fork 单进程 + SQLite）完全不符。该文件当前是错误的：任何人执行 `pm2 start ecosystem.config.js` 都会把生产切向一个不存在的 Postgres。
@@ -189,6 +225,19 @@ GitHub Secrets：`DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`。
 - 新增 `TRUST_PROXY: 'true'`
 - **移除 `CORS_ORIGIN: 'http://localhost:3000'` 硬编码**——它与 commit 7b13298 修复的 Socket.IO CORS 问题同源，留着即是下一颗雷
 - `wait_ready: true` **保留**：[server/index.js:223-224](../../../server/index.js#L223-L224) 确实在 listen 回调中发送了 ready 信号，该配置有效，且能保证 pm2 报告 online 时服务已真正就绪
+
+### 7.1 服务器 `.env` 的 CORS_ORIGIN 必须同步改
+
+线上 `.env` 实测为：
+
+```
+HMAC_SECRET=<略>
+CORS_ORIGIN=http://8.148.12.128:3001
+```
+
+访问入口从 `:3001` 移到 80 端口后，该值必须改为 `http://<公网IP>`（无端口号）。commit 7b13298 让 Socket.IO 复用 Express 的 CORS 配置，因此这个值一旦与实际访问来源不符，**WebSocket 握手会被拒绝，实时协作功能直接失效**——且 HTTP 接口仍正常，故障表现具有迷惑性。
+
+该文件位于 `shared/.env`，不进仓库、不进 CI，只能在服务器上改，属于本次实施的手工步骤。
 
 改造后由 CD 使用该文件启动，实现配置即代码。
 
@@ -208,24 +257,42 @@ GitHub Secrets：`DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`。
 
 ## 9. 风险与缓解
 
-| 风险                                                  | 影响               | 缓解                                                                                    |
-| ----------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------- |
-| 数据目录迁移丢失 SQLite 数据                          | 严重，不可逆       | 迁移前 `cp server/data/*.db /root/backup/` 并校验文件大小；迁移后先验证读写再删除旧目录 |
-| Nginx 配置错误导致站点不可用                          | 高                 | `nginx -t` 预检；3001 保持开放直至全链路验证通过                                        |
-| 只加 Nginx 未开 `TRUST_PROXY`                         | 高（限流误封全站） | 列为同一次变更的强制项，smoke 脚本外补充一次限流行为人工确认                            |
-| GitHub Actions 出口 IP 不固定，安全组限制 22 端口来源 | 中（CD 连不上）    | 实施前确认安全组 22 规则；若有来源限制需放宽或改用自托管 runner                         |
-| CD 上线后误 push 触发意外部署                         | 中                 | 门禁四关 + 健康检查回滚兜底；工作区现有 3 个未提交改动需先行处理                        |
-| release 目录堆积占满磁盘                              | 低                 | 部署末尾保留最近 5 个，其余清理                                                         |
+| 风险                                                  | 影响               | 缓解                                                                                     |
+| ----------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
+| 数据目录迁移丢失 SQLite 数据                          | 严重，不可逆       | **必须用 WAL 感知的备份方式**（见 §4.3），不可用 `cp *.db`；迁移后逐表核对行数再删旧目录 |
+| Nginx 配置错误导致站点不可用                          | 高                 | `nginx -t` 预检；3001 保持开放直至全链路验证通过                                         |
+| 只加 Nginx 未开 `TRUST_PROXY`                         | 高（限流误封全站） | 列为同一次变更的强制项，smoke 脚本外补充一次限流行为人工确认                             |
+| GitHub Actions 出口 IP 不固定，安全组限制 22 端口来源 | 中（CD 连不上）    | 已定方案：22 放行 0.0.0.0/0 + §6.7 四项硬化                                              |
+| 22 暴露公网后遭密码爆破                               | 高                 | 硬化四项必须**先于**安全组放开执行；`PasswordAuthentication no` + fail2ban               |
+| SQLite 无备份机制                                     | 中（数据不可恢复） | DEPLOY.md 记载的 crontab 实测从未配置；本次一并补上 WAL 感知的每日备份                   |
+| CD 上线后误 push 触发意外部署                         | 中                 | 门禁四关 + 健康检查回滚兜底；工作区现有 3 个未提交改动需先行处理                         |
+| release 目录堆积占满磁盘                              | 低                 | 部署末尾保留最近 5 个，其余清理                                                          |
 
-## 10. 实施前置检查
+## 10. 实施前置检查（已于 2026-08-14 完成）
 
-以下前提需在动手前于服务器上确认（只读操作）：
+服务器实测结果，全部符合本设计的前提假设：
 
-1. `ls -ld /root` 权限确为 700（验证 §4.2 的迁移必要性）
-2. `nginx -v`：Nginx 是否已安装及版本
-3. `ss -tlnp | grep :80`：80 端口是否被占用
-4. 阿里云安全组 22 端口入站规则来源范围
-5. `df -h`：磁盘余量是否够放多个 release
+| 检查项        | 实测结果                                                           | 对设计的影响                              |
+| ------------- | ------------------------------------------------------------------ | ----------------------------------------- |
+| `/root` 权限  | `drwx------`（700）                                                | 确认 §4.2 迁移到 `/srv/labelhub` 是必需的 |
+| Nginx         | 未安装                                                             | 需 `apt install nginx`（apt 源实测可用）  |
+| 80 / 443 端口 | 空闲                                                               | 无冲突                                    |
+| 3001 监听     | `*:3001`（即 `0.0.0.0`）                                           | 确认 §5.6 需改为绑定 `127.0.0.1`          |
+| 磁盘          | 40G 总量，已用 8.2G，余 30G                                        | 充足，可放多个 release                    |
+| 内存          | 1.6G，已用 501M，可用 1.1G（swap 4G）                              | 可容纳 Nginx + fail2ban                   |
+| 运行时        | Node v22.23.1 / npm 10.9.8 / pm2 7.0.3（`/usr/bin/pm2`）           | pm2 全局可用，`deploy` 用户可直接调用     |
+| pm2 现状      | `labelhub` fork 单进程，root 运行，`pm2-root.service` 已 enabled   | 换 `deploy` 用户后需重做 `pm2 startup`    |
+| SQLite        | `journal_mode=wal`，主库 208KB，**WAL 4.1MB**                      | 见 §4.3，备份方式必须改                   |
+| `.env`        | 含 `HMAC_SECRET`、`CORS_ORIGIN=http://8.148.12.128:3001`           | 见 §7.1，CORS_ORIGIN 必须改               |
+| `/srv`        | 已存在，内有阿里云安骑士诱饵目录 `.maegis` / `.zaegis` / `.~aegis` | 与 `/srv/labelhub` 互不干扰，无需处理     |
+| sshd          | `PasswordAuthentication yes`、`PermitRootLogin yes`                | 见 §6.7，放开 22 前必须先硬化             |
+| 普通用户      | 无（UID ≥ 1000 为空）                                              | 需新建 `deploy` 用户                      |
+| fail2ban      | 未安装                                                             | 需安装                                    |
+| 安全组入方向  | 3001 对 `0.0.0.0/0` 开放；22 仅放行单个 IP；**80 无规则**          | 需新增 80 规则、改 22 规则、删 3001 规则  |
+| 备份          | 无 `/root/backup`，`crontab -l` 为空                               | DEPLOY.md 记载的每日备份从未生效，见 §9   |
+| 工作区        | 干净，HEAD = `7b13298`                                             | 无未提交改动干扰                          |
+
+附带发现（不影响本次实施）：`aegis.service` 自 2026-08-12 起处于 failed 状态，但 `aegis_client` 子进程仍在运行。
 
 ## 11. 验收标准
 
@@ -236,3 +303,8 @@ GitHub Secrets：`DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`。
 5. 人为制造一次健康检查失败，验证自动回滚生效且 job 变红
 6. 服务器上不存在前端 `node_modules`
 7. `ecosystem.config.js` 与线上运行配置一致
+8. `sshd -T | grep passwordauthentication` 输出 `no`，fail2ban 处于 active
+9. pm2 进程以 `deploy` 用户运行，`pm2-deploy.service` 已 enabled；`deploy` 无 root 权限（仅 `systemctl reload nginx` 一项 sudo）
+10. 数据迁移后七张表行数与 §4.3 基线完全一致
+11. WAL 感知的每日备份 crontab 生效，且产出的快照可被独立打开并读出正确行数
+12. WebSocket 实时功能可用（验证 §7.1 的 CORS_ORIGIN 已正确更新）
