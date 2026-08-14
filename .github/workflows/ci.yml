@@ -116,3 +116,63 @@ jobs:
           name: dist
           path: dist/
           retention-days: 7
+
+  # ── Deploy ────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, build]
+    # 四道门禁全绿、且仅 main 分支的 push 才部署（PR 不触发）
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # CI 已构建并上传，服务器不再重复构建：省去约 1.5 分钟与 vite build 的内存峰值
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Configure SSH
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Compute release name
+        id: rel
+        run: echo "name=$(date +%Y%m%d)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          REL: ${{ steps.rel.outputs.name }}
+        run: |
+          TARGET="$DEPLOY_USER@$HOST"
+          ssh "$TARGET" "mkdir -p /srv/labelhub/releases/$REL/server"
+          rsync -az --delete dist/ "$TARGET:/srv/labelhub/releases/$REL/dist/"
+          rsync -az --delete --exclude node_modules --exclude data \
+            server/ "$TARGET:/srv/labelhub/releases/$REL/server/"
+          rsync -az scripts/ "$TARGET:/srv/labelhub/releases/$REL/scripts/"
+          rsync -az ecosystem.config.cjs "$TARGET:/srv/labelhub/releases/$REL/"
+          # activate.sh 常驻 shared/：回滚时 current 可能已被切走，不能依赖它
+          rsync -az scripts/activate.sh "$TARGET:/srv/labelhub/shared/activate.sh"
+
+      # 切换 → 健康检查 → 失败自动回滚。脚本以非零码退出时本步骤即失败，
+      # 因此 CD 显示绿色等价于线上真实可用。
+      - name: Activate with health check and auto-rollback
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          REL: ${{ steps.rel.outputs.name }}
+        run: ssh "$DEPLOY_USER@$HOST" "bash /srv/labelhub/shared/activate.sh '$REL'"
