@@ -1,3 +1,4 @@
+// 通知发布页面，编辑并发送站内通知。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -74,7 +75,7 @@ export default function NotificationPublish() {
     void fetchUsers();
   }, [fetchUsers]);
 
-  // 「复制再发」：从查询参数预填标题与内容（等价 Vue onMounted 读取 route.query）
+  // 从查询参数预填“复制再发”的标题和内容。
   useEffect(() => {
     const title = searchParams.get('title');
     const messageText = searchParams.get('message');

@@ -1,3 +1,4 @@
+// 统计看板，展示标注量、审核量和质量指标。
 import { useEffect, useMemo } from 'react';
 import {
   Alert,

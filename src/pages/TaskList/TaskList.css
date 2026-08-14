@@ -1,3 +1,4 @@
+/* 任务列表页面的样式。 */
 .task-list-page .search-input {
   width: min(280px, 100%);
 }

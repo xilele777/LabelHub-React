@@ -1,3 +1,4 @@
+// 审核工作台，处理待审数据、审核意见和流转操作。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
@@ -60,7 +61,7 @@ import {
 } from './reviewDisplay';
 import './ReviewWorkbench.css';
 
-// ── 虚拟滚动列表：分组头 + 条目拍平成变高行 ─────────────
+// 虚拟滚动列表：分组头和条目统一为可变高行。
 type ReviewListRow =
   { type: 'group'; key: string; taskId: string } | { type: 'item'; key: string; item: DataItem };
 
@@ -143,7 +144,7 @@ export default function ReviewWorkbench() {
     return map;
   }, [tasks]);
 
-  // ── 筛选逻辑 ──────────────────────────────
+  // 筛选逻辑。
   const {
     filters,
     setFilter,
@@ -167,7 +168,7 @@ export default function ReviewWorkbench() {
     await Promise.all([store.fetchDataItems(queryTaskId), store.fetchAIReviews(queryTaskId)]);
   }, [queryTaskId]);
 
-  // ── 领取审核池 ────────────────────────────
+  // 领取审核池。
   const {
     claimModalOpen,
     setClaimModalOpen,
@@ -209,7 +210,7 @@ export default function ReviewWorkbench() {
     scrollIntoView: scrollListRowIntoView,
   } = useVirtualList(listRows, { itemHeight: getRowHeight, overscan: 6 });
 
-  // 初始加载与 query 任务变化：拉取数据 + 任务列表
+  // 初始加载或任务筛选变化时拉取数据和任务列表。
   useEffect(() => {
     if (queryTaskId) setFilter({ taskId: queryTaskId });
   }, [queryTaskId, setFilter]);
@@ -225,7 +226,7 @@ export default function ReviewWorkbench() {
       .catch(() => setTasks([]));
   }, []);
 
-  // WebSocket 生命周期（handler 经 latest-ref 读最新上下文）
+  // WebSocket 生命周期；事件处理器通过镜像引用读取最新上下文。
   const socketCtxRef = useRef({ refreshData, claimModalOpen, loadReviewPool });
   useEffect(() => {
     socketCtxRef.current = { refreshData, claimModalOpen, loadReviewPool };
@@ -250,8 +251,7 @@ export default function ReviewWorkbench() {
     };
     const handleNotification = (notification: Notification) => {
       if (!REFRESH_NOTIFICATION_TYPES.has(notification.type)) return;
-      // 自己刚操作过的条目，后端回推通知时跳过全量刷新（store 已本地更新），
-      // 避免数组重建打乱列表位置、造成滚动跳跃。
+      // 自己刚操作过的条目已由 store 更新，跳过刷新以保持列表位置。
       const payloadItemId = (notification.data as { dataItemId?: unknown } | undefined)?.dataItemId;
       if (payloadItemId && recentIds.has(String(payloadItemId))) {
         if (socketCtxRef.current.claimModalOpen) void socketCtxRef.current.loadReviewPool();
@@ -298,8 +298,7 @@ export default function ReviewWorkbench() {
     });
   }, [filteredItems]);
 
-  // query 指定条目：数据到位后定位一次（Vue 版 watch 仅 immediate 触发，
-  // 数据晚到时定位失效——React 版等 dataItems 就绪后完成一次定位）
+  // query 指定的条目在数据加载完成后定位一次。
   const queryLocatedRef = useRef(false);
   useEffect(() => {
     queryLocatedRef.current = false;
@@ -312,7 +311,7 @@ export default function ReviewWorkbench() {
     }
   }, [queryDataItemId, dataItems]);
 
-  // 任务模板预加载（标注结果字段名 → label 显示）
+  // 预加载任务模板，用于显示标注字段名称。
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -330,8 +329,7 @@ export default function ReviewWorkbench() {
     };
   }, [tasks]);
 
-  // 选中项变化（含筛选后的自动选中）时滚动到可见位置；
-  // 仅在 selectedId 真正变化时滚动，列表数据刷新不触发
+  // 选中项真正变化时滚动到可见位置，列表刷新不触发滚动。
   const prevSelectedIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (selectedId === prevSelectedIdRef.current) return;
@@ -384,7 +382,7 @@ export default function ReviewWorkbench() {
     }
   }
 
-  // ── 键盘导航：↑↓ 切换审核列表条目，Enter 聚焦操作区 ─────────
+  // 键盘上下切换条目，Enter 聚焦操作区。
   function onListKeydown(event: React.KeyboardEvent) {
     const ids = filteredItems.map((item) => item.id);
     if (ids.length === 0) return;
@@ -465,7 +463,7 @@ export default function ReviewWorkbench() {
         .approveItem(currentId, useAuthStore.getState().user?.username ?? '');
       message.success('审核通过');
       rememberLocalAction(currentId);
-      // 不全量 refresh：依赖 store 本地更新，避免数组重建导致列表位置漂移/跳跃。
+      // 依赖 store 的本地更新，避免重建数组导致列表位置跳动。
       // 列表里还有可审核项时按显示顺序依次走；全部审完才连续领取下一条。
       const hasNext = selectNextActionable(currentId, anchorIndex);
       if (!hasNext) await tryContinuousClaim();
@@ -681,7 +679,7 @@ export default function ReviewWorkbench() {
                   onScroll={onListScroll}
                   onKeyDown={onListKeydown}
                 >
-                  {/* 虚拟滚动：phantom 层撑起总高度，仅渲染视口内（含 overscan）的行 */}
+                  {/* 用占位层撑起总高度，只渲染视口附近的行。 */}
                   <div className="review-list-phantom" style={{ height: `${listTotalHeight}px` }}>
                     {visibleListRows.map((row) => (
                       <div

@@ -1,11 +1,11 @@
 /**
- * Auth Store 单元测试（Zustand 版）
+ * 认证状态仓库单元测试（Zustand 版）
  *
  * 与 Pinia 版差异：
  *   - 无 setActivePinia；用 setState(createInitialAuthState()) 模拟重新初始化
  *   - getState() 返回不可变快照，每次断言前需重新获取
  *   - token 持久化断言对齐实际行为：token 存 localStorage
- *     （Vue 版该断言与实现矛盾且一直失败，见 REACT-MIGRATION.md 进度记录）
+ *     以实际会话行为为准，token 会持久化到 localStorage。
  *
  * 运行: npx vitest run src/__tests__/useAuthStore.test.ts
  */

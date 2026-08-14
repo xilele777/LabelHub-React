@@ -1,3 +1,4 @@
+// 根据滚动位置计算列表可见项，减少大列表渲染开销。
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 export interface VirtualRow<T> {
@@ -134,9 +135,7 @@ export function useVirtualList<T>(items: T[], options: UseVirtualListOptions<T>)
     [offsets],
   );
 
-  // callback ref：容器挂载即测量视口高度并跟随尺寸变化，卸载时清理观察器。
-  // 容器可能因条件渲染延迟出现或销毁重建（列表先 loading/empty 再有数据），
-  // callback ref 天然覆盖这些时机（等价 Vue 版 watch(containerRef)）。
+  // 容器挂载时测量视口并监听尺寸变化，卸载或重建时同步清理观察器。
   const containerRef = useCallback((el: HTMLElement | null) => {
     observerRef.current?.disconnect();
     observerRef.current = null;

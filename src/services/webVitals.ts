@@ -1,3 +1,4 @@
+// 采集页面核心性能指标并发送到监控接口。
 import { onCLS, onFCP, onINP, onLCP, onTTFB, type Metric } from 'web-vitals';
 
 const ENDPOINT = '/api/web-vitals';

@@ -1,3 +1,4 @@
+// 展示审核记录和状态流转时间线的弹窗。
 import { Empty, Modal, Space, Tag, Timeline, Typography } from 'antd';
 import type { AuditHistoryRecord } from '../../../types';
 import { actionMeta, formatTime, statusLabel } from '../reviewDisplay';

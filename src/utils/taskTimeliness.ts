@@ -1,3 +1,4 @@
+// 计算任务时效等级及对应展示信息。
 import dayjs from 'dayjs';
 import { TaskStatus, type TaskItem } from '../types';
 

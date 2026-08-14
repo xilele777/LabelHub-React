@@ -1,3 +1,4 @@
+// 规则预审引擎的规则匹配与结果生成测试。
 import { describe, it, expect } from 'vitest';
 import { runAIReview, type RunReviewInput } from '../services/aiReviewEngine';
 import { FieldType, ReviewStatus } from '../types';
@@ -97,7 +98,7 @@ describe('runAIReview', () => {
       taskId: 't4',
     };
     const result = runAIReview(input);
-    // R004 对非必填但为空的分类字段报 error
+    // R004 会对非必填但为空的分类字段报告严重问题。
     expect(result.fieldWarnings.length).toBeGreaterThan(0);
   });
 

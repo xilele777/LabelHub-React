@@ -1,3 +1,4 @@
+// 模板管理页面，负责模板列表、筛选和基础操作。
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -38,7 +39,7 @@ export default function TemplateManage() {
   const loading = useTemplateStore((state) => state.loading);
   const error = useTemplateStore((state) => state.error);
 
-  // keep-alive 的替代：初值取自会话级缓存，回到列表页时恢复上次筛选与页码
+  // 从会话缓存恢复上次的筛选条件和页码。
   const cached = useListCacheStore.getState().templateManage;
   const [keyword, setKeyword] = useState(cached.keyword);
   const [page, setPage] = useState(cached.page);
@@ -48,7 +49,7 @@ export default function TemplateManage() {
   const [previewData, setPreviewData] = useState<AnnotationTemplate | null>(null);
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
 
-  // 防抖关键词生效时回到第一页，避免筛选结果变化后页码越界（渲染期同步，等价 Vue watch）
+  // 关键词生效后回到第一页，避免筛选结果变化导致页码越界。
   const [prevKeyword, setPrevKeyword] = useState(debouncedKeyword);
   if (prevKeyword !== debouncedKeyword) {
     setPrevKeyword(debouncedKeyword);

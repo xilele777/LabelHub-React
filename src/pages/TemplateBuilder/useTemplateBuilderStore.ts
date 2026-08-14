@@ -1,3 +1,4 @@
+// 模板构建器的字段编辑和保存状态。
 import { create } from 'zustand';
 import { logger } from '../../utils/logger';
 import {
@@ -51,7 +52,7 @@ export interface TemplateBuilderState {
 
 interface TemplateBuilderActions {
   addField(type: FieldType): void;
-  /** dnd-kit 从物料区拖入画布时按落点插入（Vue 版由 sortablejs clone 机制隐式完成） */
+  /** 将物料区字段按落点插入画布。 */
   insertField(field: TemplateField, index: number): void;
   removeField(id: string): void;
   selectField(id: string | null): void;

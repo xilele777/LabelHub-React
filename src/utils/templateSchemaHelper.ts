@@ -41,7 +41,7 @@ export async function getTemplateSchemaAsync(
   const cached = schemaCache.get(templateId);
   if (cached) return cached;
 
-  // 2. 从 API 获取
+  // 2. 从接口获取。
   try {
     const res = await templateApi.getTemplate(templateId);
     const schema = serverTemplateToSchema(res.data as TemplateItem & { fields?: TemplateField[] });

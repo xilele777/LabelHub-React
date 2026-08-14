@@ -1,3 +1,4 @@
+/* 网络状态提示条的视觉样式。 */
 .network-bar {
   display: flex;
   align-items: center;
@@ -35,7 +36,7 @@
   white-space: nowrap;
 }
 
-/* Vue Transition → CSS 进入动画（离场动画省略：条挂载/卸载即隐即现） */
+/* 状态条出现时的进入动画。 */
 @keyframes network-bar-enter {
   from {
     transform: translateY(-100%);

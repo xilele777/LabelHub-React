@@ -1,3 +1,4 @@
+// 模板列表及模板编辑相关的全局状态。
 import { create } from 'zustand';
 import type { TemplateItem } from '../types';
 import * as templateApi from '../api/template';

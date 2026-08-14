@@ -1,3 +1,4 @@
+// 通用骨架屏组件，用于页面数据加载期间占位。
 import { Card, Col, Divider, Row, Skeleton } from 'antd';
 import './SkeletonLoader.css';
 
@@ -14,13 +15,13 @@ export interface SkeletonLoaderProps {
 export default function SkeletonLoader({ variant = 'content' }: SkeletonLoaderProps) {
   return (
     <div className="skeleton-loader">
-      {/* Page header skeleton */}
+      {/* 页面标题占位 */}
       <div className="skeleton-header">
         <Skeleton active paragraph={false} title={{ width: '30%' }} />
         <Skeleton active paragraph={false} title={{ width: '60%' }} />
       </div>
 
-      {/* Card content skeleton */}
+      {/* 卡片内容占位 */}
       <Card className="skeleton-card">
         {variant === 'table' ? (
           <>

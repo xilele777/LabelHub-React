@@ -1,3 +1,4 @@
+/* 主布局及侧边导航的样式。 */
 .labelhub-layout {
   min-height: 100vh;
   height: 100vh;
@@ -405,7 +406,7 @@
   width: 100%;
   max-width: 1360px;
   margin-inline: auto;
-  /* Vue page-fade transition（out-in）→ 进入动画（复用 enter-from 参数） */
+  /* 页面切换时的进入动画。 */
   animation: lh-page-enter var(--lh-motion-slow) var(--lh-ease-emphasized);
 }
 
@@ -455,7 +456,7 @@
   }
 }
 
-/* ── 无障碍：跳至内容链接（Tab 聚焦时可见） ── */
+/* 无障碍跳转链接，获得焦点时显示。 */
 .skip-to-content {
   position: fixed;
   top: -100%;

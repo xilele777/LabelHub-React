@@ -1,3 +1,4 @@
+// 管理导出 Worker 的调用、进度回传和文件下载。
 import {
   CSV_BOM,
   ExportFormat,
@@ -64,7 +65,7 @@ function serializeExport(records: ExportRecord[], format: ExportFormat): Promise
   return new Promise<string>((resolve, reject) => {
     const id = ++seq;
     pending.set(id, { resolve, reject });
-    // Zustand 数据为普通对象，可直接 structured clone（Vue 版需先 deepToRaw 解响应式 Proxy）
+    // store 中的数据是普通对象，可以直接通过 structured clone 传给 Worker。
     instance.postMessage({ id, format, records });
   });
 }
@@ -88,7 +89,7 @@ export async function performExportInWorker(
   try {
     content = await serializeExport(records, format);
   } catch {
-    // Worker 异常时退化，保证导出功能始终可用
+    // Worker 异常时退回主线程，保证导出功能可用。
     content = serializeOnMainThread(records, format);
   }
   downloadFile(content, filename, mimeType);

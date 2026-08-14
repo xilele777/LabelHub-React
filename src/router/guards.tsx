@@ -1,10 +1,11 @@
+// 路由访问控制，处理登录状态和角色权限校验。
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import type { Role } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { getDefaultPath, hasRouteRole } from '../utils/roleHelper';
 
-/** 登录守卫：未登录跳转 /login 并携带回跳地址（等价 Vue router.beforeEach 的登录检查） */
+/** 未登录时跳转登录页，并保留原地址。 */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const location = useLocation();
@@ -17,7 +18,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
-/** 角色守卫：无对应角色跳转 /403（等价 Vue 路由 meta.roles 检查） */
+/** 当前角色无权访问时跳转无权限页面。 */
 export function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }) {
   const role = useAuthStore((state) => state.role);
 

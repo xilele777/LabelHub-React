@@ -1,3 +1,4 @@
+/* 标注工作台的布局和字段编辑样式。 */
 .annotation-workbench {
   display: flex;
   flex-direction: column;
@@ -192,7 +193,7 @@
   }
 }
 
-/* 领取弹窗（portal 渲染在 body 下，不能带页面前缀） */
+/* 领取弹窗挂载在 body 下，因此不使用页面根节点前缀。 */
 .aw-claim-toolbar {
   margin-bottom: 12px;
 }

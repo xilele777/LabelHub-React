@@ -1,3 +1,4 @@
+/* 错误边界提示页面的布局样式。 */
 .error-boundary {
   display: flex;
   align-items: center;

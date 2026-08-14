@@ -1,3 +1,4 @@
+// 标注工作台中的数据项、选中项和保存状态。
 import { create } from 'zustand';
 import { logger } from '../utils/logger';
 import {
@@ -132,7 +133,7 @@ export function createInitialAnnotationState(): AnnotationState & AnnotationDeri
 }
 
 export const useAnnotationStore = create<AnnotationStore>()((set, get) => {
-  /** 统一入口：合并 patch 并重算全部派生字段（等价 Pinia computed） */
+  /** 合并状态变更，并同步更新派生字段。 */
   function patch(partial: Partial<AnnotationState>): void {
     const next = { ...get(), ...partial };
     set({

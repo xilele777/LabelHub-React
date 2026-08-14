@@ -1,3 +1,4 @@
+// 监控看板，展示任务运行状态和实时指标。
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -249,7 +250,7 @@ export default function MonitoringBoard() {
     }
   }, [days]);
 
-  // 首次挂载 + days 变化时拉取；仅首次失败弹 warning（等价 Vue onMounted 的提示语义）
+  // 首次加载和时间范围变化时拉取数据；首次失败时提示用户。
   const firstLoadRef = useRef(true);
   useEffect(() => {
     const isFirst = firstLoadRef.current;

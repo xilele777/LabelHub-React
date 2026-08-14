@@ -24,7 +24,7 @@ export function getMeApi() {
   return get<UserInfo>('/auth/me');
 }
 
-// ===== 用户管理（管理员） =====
+// 用户管理（管理员）。
 
 export interface UserListResult {
   items: UserInfo[];

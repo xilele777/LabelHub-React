@@ -1,11 +1,11 @@
+// 列表筛选条件与分页结果的短期缓存。
 import { create } from 'zustand';
 import type { TaskStatus } from '../types';
 
 /**
  * 列表页筛选/分页状态缓存。
  *
- * 替代 Vue 版 `<keep-alive include="TaskListPage,TemplateManagePage">`：React 没有原生的组件实例缓存，
- * 列表页在跳转到详情/编辑页时会真实卸载，回来时筛选条件与页码会丢失。这里把这部分状态放到 store，
+ * 列表页跳转到详情或编辑页时会卸载，筛选条件和页码因此需要放到 store 保存，
  * 页面挂载时用它做初值，从而复现"从详情页返回仍停在原筛选与页码"的体验。
  *
  * 会话级：clearSession（登出 / 登录过期）时整体重置，避免残留到下一个登录用户。

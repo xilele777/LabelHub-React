@@ -1,3 +1,4 @@
+// 批量领取审核项的确认弹窗。
 import { Button, Checkbox, Modal, Space, Table, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
 import type { Key } from 'react';

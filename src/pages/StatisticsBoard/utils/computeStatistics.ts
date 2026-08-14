@@ -1,6 +1,4 @@
-/**
- * Statistics board aggregation helpers.
- */
+/** 统计看板的数据聚合工具。 */
 import {
   DataItemStatus,
   ReviewStatus,

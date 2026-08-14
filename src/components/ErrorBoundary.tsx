@@ -1,3 +1,4 @@
+// 全局错误边界，捕获渲染异常并提供恢复入口。
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Button, Result, Space } from 'antd';
 import { useNavigate } from 'react-router';
@@ -14,7 +15,7 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-/** React class 原生错误边界（等价 Vue 版 onErrorCaptured） */
+/** 捕获子树渲染错误并提供恢复入口。 */
 class ErrorBoundaryImpl extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
 

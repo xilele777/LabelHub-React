@@ -1,3 +1,4 @@
+// 模板字段属性编辑面板。
 import {
   Button,
   Card,
@@ -43,7 +44,7 @@ interface PropertyPanelProps {
   typeLabel: string;
   configItems: ConfigItem[];
   fieldOptions: FieldOption[];
-  /** tab 受控：schemaJson 仅在 schema 页激活时由父组件计算（Vue 版 tab 状态未上报导致预览恒空，React 版修正） */
+  /** 当前面板页签，只有结构预览页需要展示 schemaJson。 */
   activeTab: string;
   onTabChange: (tab: string) => void;
   onUpdateField: (key: string, value: unknown) => void;

@@ -1,3 +1,4 @@
+// 当前用户会话、登录状态和权限信息。
 import { create } from 'zustand';
 import type { UserInfo } from '../types';
 import { AUTH_EXPIRED_EVENT } from '../api/authEvents';
@@ -137,7 +138,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       const { releaseAllItems } = await import('../api/annotation');
       await releaseAllItems();
     } catch {
-      // Releasing item locks should not block logout.
+      // 释放条目锁失败时仍应继续登出。
     }
 
     get().clearSession();

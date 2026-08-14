@@ -1,3 +1,4 @@
+/* 审核工作台的布局和交互样式。 */
 .review-workbench {
   display: flex;
   flex-direction: column;
@@ -270,7 +271,7 @@
   }
 }
 
-/* ========== 子 Modal（portal 渲染在 body 下，不能带页面前缀） ========== */
+/* 子弹窗挂载在 body 下，因此不使用页面根节点前缀。 */
 
 .rw-claim-toolbar {
   margin-bottom: 12px;

@@ -1,3 +1,4 @@
+// 草稿持久化 Hook 的保存、恢复和版本校验测试。
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import {
@@ -45,7 +46,7 @@ describe('useDraftPersistence', () => {
   }
 
   function setup() {
-    // 外部可变对象模拟表单 state：restore 写回后由 rerender 触发快照更新
+    // 用可变对象模拟表单状态，restore 写回后通过重新渲染更新快照。
     const state: Form = {};
     const restoredRecords: DraftRecord<Form>[] = [];
 

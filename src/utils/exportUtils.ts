@@ -1,7 +1,8 @@
+// 将标注数据整理为可下载的导出记录。
 import { DataItemStatus, type DataItem } from '../types';
 import type { AIReviewResult } from '../types/aiReview';
 
-// ========== 导出数据类型定义 ==========
+// 导出数据类型。
 
 /** 人工审核结果（导出用） */
 export interface HumanReviewResult {
@@ -35,7 +36,7 @@ export enum ExportFormat {
   CSV = 'csv',
 }
 
-// ========== 导出字段映射方案 ==========
+// 导出字段映射。
 // 详细映射说明见本文件末尾注释
 
 /** CSV 列定义：key → 列标题（中文） */
@@ -72,7 +73,7 @@ export const CSV_COLUMN_ORDER: string[] = [
   'humanReviewResult',
 ];
 
-// ========== 数据构造 ==========
+// 构造导出数据。
 
 function getHumanReviewConclusion(status: DataItemStatus): 'approved' | 'rejected' | null {
   if (status === DataItemStatus.REVIEWED) return 'approved';
@@ -121,7 +122,7 @@ export function filterByRange(records: ExportRecord[], range: ExportRange): Expo
   }
 }
 
-// ========== CSV 转换工具 ==========
+// CSV 转换。
 
 export function escapeCsvCell(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
@@ -169,7 +170,7 @@ export function exportRecordsToCsv(records: ExportRecord[]): string {
   return [header.join(','), ...rows].join('\n');
 }
 
-// ========== 文件下载工具 ==========
+// 文件下载。
 
 export function downloadFile(
   content: string,
@@ -193,7 +194,7 @@ export function downloadAsJson(records: ExportRecord[], filename: string): void 
   downloadFile(jsonStr, filename, 'application/json;charset=utf-8');
 }
 
-/** UTF-8 BOM \u524D\u7F00\uFF1AExcel \u6B63\u786E\u8BC6\u522B\u4E2D\u6587 CSV \u7F16\u7801\u7528 */
+/** CSV 文件前缀，帮助 Excel 正确识别中文编码。 */
 export const CSV_BOM = '\uFEFF';
 
 export function downloadAsCsv(records: ExportRecord[], filename: string): void {
@@ -218,7 +219,7 @@ export function performExport(
 }
 
 /*
- * ========== 导出字段映射方案 ==========
+ * 导出字段映射方案：
  *
  * | 导出字段            | 数据来源                              | CSV 列名              | CSV 处理方式          |
  * |--------------------|--------------------------------------|----------------------|----------------------|

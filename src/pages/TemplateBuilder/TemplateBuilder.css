@@ -1,3 +1,4 @@
+/* 模板构建器的编辑区和工具栏样式。 */
 .template-builder {
   display: flex;
   flex-direction: column;
@@ -235,7 +236,7 @@
   box-shadow: 0 8px 24px rgba(26, 115, 232, 0.18);
 }
 
-/* DragOverlay 渲染在 body 下（portal），不能带 .template-builder 前缀 */
+/* 拖拽浮层挂载在 body 下，因此不使用页面根节点前缀。 */
 .tb-drag-overlay-item {
   display: flex;
   align-items: center;
@@ -270,7 +271,7 @@
   text-overflow: ellipsis;
 }
 
-/* ========== PropertyPanel ========== */
+/* 属性面板。 */
 
 .template-builder .inspector-card .ant-card-body {
   padding: 0;
@@ -362,7 +363,7 @@
   word-break: break-all;
 }
 
-/* ========== 导入 Modal（portal 渲染在 body 下） ========== */
+/* 导入弹窗，挂载在 body 下。 */
 
 .tb-import-body {
   display: flex;

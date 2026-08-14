@@ -1,3 +1,4 @@
+// 任务详情中的审核人员分配面板。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, App, Button, Card, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
@@ -27,7 +28,7 @@ export default function ReviewAssignmentPanel({ taskId }: { taskId: string }) {
   const [items, setItems] = useState<ReviewAssignableItem[]>([]);
   const [reviewAssignments, setReviewAssignments] = useState<Record<string, string>>({});
 
-  // 刷新列表时保留用户已选但未提交的审核员（Vue 版靠 reactive 上的 `id in map` 判断）
+  // 刷新列表时保留已选择但未提交的审核员。
   const reviewAssignmentsRef = useRef(reviewAssignments);
   reviewAssignmentsRef.current = reviewAssignments;
 

@@ -1,7 +1,7 @@
 /**
  * WebSocket 通知客户端服务
  *
- * 基于 Socket.IO Client，管理与后端的 WebSocket 连接：
+ * 基于 Socket.IO 客户端，管理与后端的 WebSocket 连接：
  *   - 登录后自动连接，登出后自动断开
  *   - 接收实时通知并转发到通知 store
  *   - 支持加入/离开任务房间
@@ -11,7 +11,7 @@ import { io, Socket } from 'socket.io-client';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { logger } from '../utils/logger';
 
-// 默认开发环境直连后端，避免经 Vite 代理转发 WebSocket 产生噪音；生产环境可通过 VITE_WS_URL 覆盖。
+// 开发环境默认直连后端，生产环境可通过 VITE_WS_URL 覆盖地址。
 const WS_URL =
   import.meta.env.VITE_WS_URL ||
   (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
@@ -95,7 +95,7 @@ export function connectNotificationWS(token: string): void {
     autoConnect: true,
   });
 
-  // ─── 连接事件 ──────────────────────────────────
+  // 连接相关事件。
 
   socket.on('connect', () => {
     logger.log('[WS] 连接成功:', socket?.id);
@@ -148,7 +148,7 @@ export function connectNotificationWS(token: string): void {
     }
   });
 
-  // ─── 通知事件 ──────────────────────────────────
+  // 通知事件。
 
   socket.on('notification', (notification: Notification) => {
     if (!isNotificationForCurrentUser(notification)) {
@@ -158,17 +158,16 @@ export function connectNotificationWS(token: string): void {
 
     logger.log('[WS] 收到通知:', notification.type, notification.title);
 
-    // 将通知推送到 store
+    // 先写入通知状态，再按优先级提示用户。
     const store = useNotificationStore.getState();
     store.addNotification(notification);
 
-    // 根据优先级决定是否播放提示音或弹出桌面通知
     if (notification.priority === 'high') {
       showDesktopNotification(notification);
     }
   });
 
-  // ─── 其他事件 ──────────────────────────────────
+  // 已读回执。
 
   socket.on('notification:read_ack', (data) => {
     logger.log('[WS] 通知已读确认:', data);

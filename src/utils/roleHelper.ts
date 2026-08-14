@@ -1,3 +1,4 @@
+// 处理角色标准化和角色对应的默认页面。
 import { Role } from '../types';
 
 export function normalizeRole(role: Role | string | null | undefined): Role | null {

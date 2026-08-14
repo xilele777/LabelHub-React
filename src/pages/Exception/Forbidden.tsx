@@ -1,3 +1,4 @@
+// 403 页面，提示当前用户没有访问权限。
 import { Button, Result } from 'antd';
 import { useNavigate } from 'react-router';
 import { useAuthStore } from '../../store/useAuthStore';

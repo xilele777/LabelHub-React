@@ -1,3 +1,4 @@
+// 监听浏览器和通知连接状态，提供统一网络状态。
 import { useEffect, useRef, useState } from 'react';
 import { getSocket } from '../services/notificationWebSocket';
 import { logger } from '../utils/logger';
@@ -23,7 +24,7 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
   const [state, setState] = useState<NetworkState>(() => (navigator.onLine ? 'online' : 'offline'));
   const [justRecovered, setJustRecovered] = useState(false);
   const [wasOffline, setWasOffline] = useState(false);
-  // 事件回调里读取当前状态用镜像 ref，避免闭包捕获过期值
+  // 事件回调通过镜像引用读取最新状态，避免闭包使用旧值。
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -56,13 +57,13 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
       setState('reconnecting');
     }
 
-    // ── 1. Navigator 级检测 ──
+    // 浏览器在线状态。
     const onBrowserOnline = () => setOnline();
     const onBrowserOffline = () => setOffline();
     window.addEventListener('online', onBrowserOnline);
     window.addEventListener('offline', onBrowserOffline);
 
-    // ── 2. Socket.IO 级检测（延迟绑定，确保 Socket 已初始化） ──
+    // Socket.IO 连接状态，延迟绑定以等待全局实例初始化。
     let socketCheckTimer: ReturnType<typeof setInterval> | undefined;
     let boundSocket: ReturnType<typeof getSocket> = null;
     const onSocketDisconnect = () => setReconnecting();
@@ -81,7 +82,7 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
         bindSocket(socket);
         return;
       }
-      // Socket 尚未初始化，轮询等待
+      // Socket 尚未初始化，暂时轮询等待。
       socketCheckTimer = setInterval(() => {
         const s = getSocket();
         if (s) {
@@ -91,7 +92,7 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
       }, 500);
     }, 1000);
 
-    // ── 3. 页面可见性变化时探测（切回后台断网的场景） ──
+    // 页面重新可见时主动检查一次网络状态。
     function onVisibilityChange() {
       if (document.visibilityState !== 'visible') return;
       if (navigator.onLine) {
@@ -109,7 +110,7 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
       clearTimeout(recoverTimer);
       clearTimeout(attachTimer);
       clearInterval(socketCheckTimer);
-      // socket 是全局单例，卸载时必须摘掉本 hook 的监听（Vue 版随组件销毁整体断连，React 版需显式 off）
+      // socket 是全局单例，只移除本 Hook 注册的监听。
       boundSocket?.off('disconnect', onSocketDisconnect);
       boundSocket?.off('connect', onSocketConnect);
     };

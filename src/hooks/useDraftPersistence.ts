@@ -1,3 +1,4 @@
+// 持久化编辑草稿，并在恢复前校验数据版本。
 import { useCallback, useEffect, useRef } from 'react';
 
 export interface DraftRecord<T> {
@@ -35,7 +36,7 @@ export function clearDraftRecord(key: string): void {
   try {
     localStorage.removeItem(DRAFT_PREFIX + key);
   } catch {
-    // ignore
+    // 存储不可用时忽略清理失败。
   }
 }
 
@@ -44,7 +45,7 @@ export interface UseDraftPersistenceOptions<T> {
   key: string | null | undefined;
   /** 当前服务端数据版本，用于判断草稿是否过期 */
   version: number | string;
-  /** 当前表单快照（每次渲染传入最新值，Vue 版的 getter 在 React 中即渲染期求值） */
+  /** 当前表单快照。 */
   snapshot: T;
   /** 将草稿写回表单 */
   restore: (data: T) => void;
@@ -63,27 +64,25 @@ export interface UseDraftPersistenceOptions<T> {
  *   序列化结果直接复用为变更判据，不额外做 deep clone。
  *
  * 注意：恢复依赖 key 变化触发（useEffect [key]）—— 调用方应保证切换条目时
- * 「重置表单」在渲染上游完成，与 Vue 版的 watch 注册顺序约束等价。
+ * 调用方应在切换条目时先完成表单重置，再交给本 Hook 恢复草稿。
  */
 export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
   const { key, snapshot, debounceMs = 500 } = options;
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastSnapshotRef = useRef<string | null>(null);
-  // 首次快照仅作基线不落盘（对齐 Vue watch 非 immediate）；clear() 只清 lastSnapshot，
-  // 基线保持已建立 —— clear 后的下一次表单变化仍应正常保存
+  // 首次快照只建立基线，不立即写入；清除草稿后下一次变化仍会正常保存。
   const hasBaselineRef = useRef(false);
 
-  // latest-ref：恢复/保存逻辑总是读取最新的 version/snapshot/回调，
-  // 又不把它们放进 effect 依赖（对象/回调每渲染新引用会导致 effect 空转）
+  // 通过镜像读取最新参数，避免对象和回调引用变化导致 effect 重复执行。
   const latestRef = useRef(options);
   useEffect(() => {
     latestRef.current = options;
   });
 
-  // ── 恢复：key 变化（含首次挂载）时尝试恢复版本匹配的草稿 ──
+  // 条目变化时尝试恢复版本匹配的草稿。
   useEffect(() => {
     if (!key) return;
-    // key 变化时重置基线，避免将切换后的首次表单重置误判为用户修改
+    // 切换条目后重新建立快照基线，避免把表单重置误判为用户修改。
     hasBaselineRef.current = false;
     lastSnapshotRef.current = null;
 
@@ -98,7 +97,7 @@ export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
     latestRef.current.onRestored?.(record);
   }, [key]);
 
-  // ── 保存：快照浅序列化变化时防抖写入（首次仅记录基线，对齐 Vue watch 非 immediate 语义） ──
+  // 表单快照变化后防抖写入本地草稿。
   const shallow = key ? JSON.stringify(snapshot) : null;
   useEffect(() => {
     if (!key || shallow === null) return;
@@ -119,7 +118,7 @@ export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
     }, debounceMs);
   }, [key, shallow, debounceMs]);
 
-  // 卸载时取消未落盘的定时器（等价 Vue 版 onScopeDispose）
+  // 卸载时取消尚未写入的定时器。
   useEffect(() => {
     return () => clearTimeout(timerRef.current);
   }, []);

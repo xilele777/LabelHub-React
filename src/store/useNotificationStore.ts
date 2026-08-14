@@ -1,3 +1,4 @@
+// 通知数据、未读数量和通知读取状态。
 import { create } from 'zustand';
 import { logger } from '../utils/logger';
 import * as notificationApi from '../api/notification';
@@ -78,7 +79,7 @@ function saveToLocalStorage(userId: string | null, notifications: NotificationIt
   try {
     getStorage()?.setItem(getStorageKey(userId), JSON.stringify(notifications));
   } catch {
-    // localStorage may be unavailable or full.
+    // 存储不可用或空间不足时不影响通知功能。
   }
 }
 
@@ -97,7 +98,7 @@ function removeFromLocalStorage(userId: string): void {
   try {
     getStorage()?.removeItem(getStorageKey(userId));
   } catch {
-    // Ignore storage cleanup failures.
+    // 清理失败时忽略，不影响主流程。
   }
 }
 
@@ -111,7 +112,7 @@ function withDerived(notifications: NotificationItem[]) {
   };
 }
 
-/** 截断、重算派生字段并持久化（等价 Pinia 版 syncNotifications） */
+/** 截断通知列表、更新未读数并持久化。 */
 function buildSyncPatch(currentUserId: string | null, nextNotifications: NotificationItem[]) {
   const notifications = nextNotifications.slice(0, MAX_NOTIFICATIONS);
   saveToLocalStorage(currentUserId, notifications);

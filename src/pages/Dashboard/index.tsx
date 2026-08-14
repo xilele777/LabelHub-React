@@ -1,3 +1,4 @@
+// 首页仪表盘，汇总任务、进度和近期活动。
 import { useCallback, useEffect, useMemo } from 'react';
 import { Button, Card, Col, List, Row, Statistic, Table, Tag, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';

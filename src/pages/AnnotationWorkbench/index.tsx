@@ -1,3 +1,4 @@
+// 标注工作台，编辑标注内容并提交处理结果。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
@@ -209,13 +210,13 @@ export default function AnnotationWorkbench() {
     );
   })();
 
-  // ── 跨标签页锁检测（BroadcastChannel，条目粒度）─────────────
+  // 跨标签页锁检测（按条目区分）。
   const crossTab = useCrossTabLock(user?.id ?? '');
   const isCrossTabLocked = Boolean(currentItem && crossTab.lockedItemId === currentItem.id);
   const isEditable = !isReadOnly && !conflictInfo && !lockInfo && !isCrossTabLocked;
   const canSaveDraft = !isReadOnly && currentItem?.status !== DataItemStatus.REJECTED;
 
-  // ── 实时预审引擎 ──────────────────────────
+  // 实时预审。
   const { liveReviewResult, riskStats, sortedWarnings, fieldValidateStatus, fieldHelp } =
     useLivePreReview({
       templateSchema,
@@ -223,7 +224,7 @@ export default function AnnotationWorkbench() {
       formState,
     });
 
-  // ── 悲观编辑锁：进入可编辑条目自动加锁，切换/提交/离开自动释放 ──
+  // 可编辑条目进入时加锁，切换、提交或离开时释放。
   const { acquiring: lockAcquiring, retry: retryAcquireLock } = useEditLock({
     itemId: currentItem?.id ?? null,
     enabled:
@@ -253,7 +254,7 @@ export default function AnnotationWorkbench() {
     void refreshWorkbenchData();
   }, [refreshWorkbenchData]);
 
-  // WebSocket：连接、任务房间重进、相关通知触发数据刷新（handler 经 latest-ref 读最新上下文）
+  // WebSocket 负责连接恢复、任务房间重进和相关通知刷新数据。
   const socketCtxRef = useRef({ refreshWorkbenchData, claimModalOpen, claimTaskId });
   useEffect(() => {
     socketCtxRef.current = { refreshWorkbenchData, claimModalOpen, claimTaskId };
@@ -300,7 +301,7 @@ export default function AnnotationWorkbench() {
     });
   }, [dataItems]);
 
-  // 索引校正：query 指定条目时定位；索引越界时归零
+  // 根据查询参数定位条目，并将越界索引归零。
   useEffect(() => {
     if (dataItems.length === 0) return;
     if (queryDataItemId) {
@@ -315,7 +316,7 @@ export default function AnnotationWorkbench() {
     }
   }, [dataItems, queryDataItemId, currentIndex]);
 
-  // 模板 schema 随当前任务加载（token 守卫丢弃过期响应）
+  // 随当前任务加载模板结构，并丢弃过期请求的响应。
   const currentTemplateId = currentTask?.templateId;
   useEffect(() => {
     const requestToken = ++templateRequestTokenRef.current;
@@ -383,7 +384,7 @@ export default function AnnotationWorkbench() {
     setFormState({ ...(item?.annotationData ?? {}) });
   }, [currentItemId]);
 
-  // ── 本地草稿自动保存：防抖持久化 + 版本校验恢复 ──
+  // 自动保存草稿，并在恢复时校验服务端版本。
   const draft = useDraftPersistence({
     key: currentItem?.id ?? null,
     version: currentItem?.version ?? 1,

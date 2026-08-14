@@ -1,3 +1,4 @@
+// 通知列表、发布、已读和删除等接口。
 import { del, get, post, put } from './request';
 import type { NotificationItem } from '../store/useNotificationStore';
 

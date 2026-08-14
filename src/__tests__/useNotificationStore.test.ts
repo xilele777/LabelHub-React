@@ -1,5 +1,5 @@
 /**
- * Notification Store 单元测试（Zustand 版）
+ * 通知状态仓库单元测试（Zustand 版）
  *
  * 与 Pinia 版差异：无 setActivePinia；getState() 返回不可变快照，
  * 每次断言前需重新获取。

@@ -1,3 +1,4 @@
+// 应用根组件，提供全局上下文并承载路由内容。
 import { Suspense } from 'react';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
@@ -19,8 +20,7 @@ const googleTheme = {
   },
 };
 
-// 顶层路由 chunk（MainLayout/Login）加载期的 fallback。
-// 不可使用 SkeletonLoader —— 它依赖 antd，会把组件库拉回入口预加载链
+// 顶层路由加载期间使用轻量的占位内容，避免在入口额外引入页面组件。
 function AppLoading() {
   return (
     <div className="app-boot-loading">
@@ -32,8 +32,7 @@ function AppLoading() {
 export default function App() {
   return (
     <ConfigProvider locale={zhCN} theme={googleTheme}>
-      {/* antd 的 App 上下文组件不在此全局挂载（体积原因），
-          由 MainLayout 与 Login 在各自懒加载 chunk 内就地提供 */}
+      {/* 消息、通知和弹窗上下文由需要它们的页面分别提供。 */}
       <Suspense fallback={<AppLoading />}>
         <RouterProvider router={router} />
       </Suspense>

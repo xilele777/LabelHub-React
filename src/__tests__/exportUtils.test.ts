@@ -1,3 +1,4 @@
+// 导出数据转换与文件内容生成测试。
 import { describe, it, expect } from 'vitest';
 import {
   buildHumanReviewResult,
@@ -156,7 +157,7 @@ describe('toCsvCell', () => {
 
   it('对象序列化为 JSON 字符串（CSV 转义）', () => {
     const result = toCsvCell({ a: 1 });
-    // toCsvCell 对 object 先 JSON.stringify 再 escapeCsvCell，双引号会被转义
+    // 对象先序列化再转义，确保 CSV 中的双引号正确处理。
     expect(result).toContain('a');
     expect(result).toContain('1');
   });
@@ -189,7 +190,7 @@ describe('exportRecordsToCsv', () => {
     const review = makeAIReview(item);
     const records = buildExportRecords([item], [review]);
 
-    // 测试 CSV 序列化（不含 BOM，BOM 在 downloadAsCsv 中附加）
+    // CSV 序列化本身不添加 BOM，下载时再附加。
     const csv = exportRecordsToCsv(records);
     expect(csv).toContain('数据ID');
     expect(csv).toContain('csv-1');

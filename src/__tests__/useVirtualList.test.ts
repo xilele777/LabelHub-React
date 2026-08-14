@@ -1,3 +1,4 @@
+// useVirtualList 的可见范围和滚动行为测试。
 import { describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useVirtualList } from '@/hooks/useVirtualList';

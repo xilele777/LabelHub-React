@@ -1,3 +1,4 @@
+// 模板构建器，编辑字段结构、选项和校验规则。
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
@@ -446,7 +447,7 @@ export default function TemplateBuilder() {
   const [importText, setImportText] = useState('');
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
-  // 拖拽结束后浏览器可能补发 click（原地小位移拖拽），标记抑制避免重复添加
+  // 拖拽结束后浏览器可能补发 click，标记后抑制重复添加。
   const suppressPaletteClickRef = useRef(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));

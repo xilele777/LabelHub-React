@@ -1,3 +1,4 @@
+// 登录页面，处理账号登录和登录后的跳转。
 import { Alert, App, Button, Card, Form, Input, Spin, Typography } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -95,8 +96,7 @@ function LoginInner() {
   );
 }
 
-// AntdApp 就地包裹（Login 位于 MainLayout 之外）：为 useApp() 提供上下文，
-// 且保持该依赖留在 Login 懒加载 chunk 内、不进入口 App.tsx
+// 登录页单独提供消息和弹窗上下文，并保持相关依赖按页面加载。
 export default function Login() {
   return (
     <App>

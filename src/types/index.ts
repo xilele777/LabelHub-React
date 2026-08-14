@@ -1,4 +1,4 @@
-﻿// ========== 用户与角色类型 ==========
+// 用户与角色类型。
 
 export enum Role {
   ADMIN = 'admin', // 管理员
@@ -14,7 +14,7 @@ export interface UserInfo {
   role: Role;
 }
 
-// ========== 菜单与路由类型 ==========
+// 菜单与路由类型。
 
 export interface MenuItem {
   key: string;
@@ -25,7 +25,7 @@ export interface MenuItem {
   children?: MenuItem[];
 }
 
-// ========== 任务类型 ==========
+// 任务类型。
 
 export enum TaskStatus {
   DRAFT = 'draft', // 草稿
@@ -75,7 +75,7 @@ export interface TaskItem {
   archivedAt: string | null; // 归档时间 ISO 字符串
 }
 
-// ========== 任务分配类型 ==========
+// 任务分配类型。
 
 /** 分配策略 */
 export enum AssignmentStrategy {
@@ -115,7 +115,7 @@ export interface AnnotatorInfo {
   role: string;
 }
 
-// ========== 模板类型 ==========
+// 模板类型。
 
 export interface TemplateItem {
   id: string;
@@ -129,9 +129,9 @@ export interface TemplateItem {
   fields?: TemplateField[];
 }
 
-// ========== 动态标注模板 Schema ==========
+// 动态标注模板结构。
 
-/** 第一期支持的字段类型 */
+/** 支持的字段类型。 */
 export enum FieldType {
   INPUT = 'input', // 单行输入
   TEXTAREA = 'textarea', // 多行文本
@@ -247,7 +247,7 @@ export interface AnnotationRecord {
   createdAt: string;
 }
 
-// ========== 标注数据项类型 ==========
+// 标注数据项类型。
 
 export enum DataItemStatus {
   PENDING = 'pending', // 待标注
@@ -377,7 +377,7 @@ export interface LockData {
   lockedAt: string;
 }
 
-// ========== AI 自动预审类型（re-export） ==========
+// AI 自动预审类型。
 
 export { ReviewStatus } from './aiReview';
 export type {

@@ -1,3 +1,4 @@
+// 任务列表页面，负责查询、筛选和批量操作任务。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -54,7 +55,7 @@ export default function TaskList() {
   const navigate = useNavigate();
   const role = useAuthStore((state) => state.role);
 
-  // keep-alive 的替代：初值取自会话级缓存，回到列表页时恢复上次筛选与页码
+  // 从会话缓存恢复上次的筛选条件和页码。
   const cached = useListCacheStore.getState().taskList;
   const [keyword, setKeyword] = useState(cached.keyword);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | null>(cached.status);
@@ -67,7 +68,7 @@ export default function TaskList() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 筛选条件变化时回到第一页。渲染期同步（而非 effect），避免先用旧页码发一次请求
+  // 筛选条件变化时同步回到第一页，避免先用旧页码发起请求。
   const filtersKey = `${debouncedKeyword.trim()}|${statusFilter ?? ''}`;
   const [prevFiltersKey, setPrevFiltersKey] = useState(filtersKey);
   if (prevFiltersKey !== filtersKey) {
@@ -79,7 +80,7 @@ export default function TaskList() {
     useListCacheStore.getState().setTaskListCache({ keyword, status: statusFilter, page });
   }, [keyword, statusFilter, page]);
 
-  // 请求序号：翻页/筛选快速切换时丢弃过期响应（Vue 版无此问题，React 下 effect 触发更密）
+  // 快速切换筛选或分页时丢弃过期响应。
   const requestSeq = useRef(0);
   const fetchPage = useCallback(async () => {
     const seq = ++requestSeq.current;

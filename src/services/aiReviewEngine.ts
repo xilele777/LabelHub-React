@@ -5,9 +5,7 @@
  * 对模板中每个非 TITLE 字段逐一执行所有规则，
  * 收集命中项后汇总为 AIReviewResult。
  *
- * ──────────────────────────────────────
  * 规则设计说明
- * ──────────────────────────────────────
  *
  * | 规则ID | 名称               | 严重程度 | 适用字段类型              | 触发条件                                    |
  * |--------|--------------------|----------|---------------------------|---------------------------------------------|
@@ -34,9 +32,7 @@ import {
   type Severity,
 } from '../types/aiReview';
 
-// =====================================================================
-//  规则定义
-// =====================================================================
+// 规则定义。
 
 /** 规则执行上下文 */
 export interface RuleContext {
@@ -57,7 +53,7 @@ export interface ReviewRule {
   suggest?: (ctx: RuleContext) => ReviewSuggestion | undefined;
 }
 
-// ---------- R001 必填字段缺失 ----------
+// 规则 R001：必填字段缺失。
 
 const R001_RequiredFieldEmpty: ReviewRule = {
   ruleId: 'R001',
@@ -98,7 +94,7 @@ const R001_RequiredFieldEmpty: ReviewRule = {
   },
 };
 
-// ---------- R002 评分超出范围 ----------
+// 规则 R002：评分超出范围。
 
 const R002_RatingOutOfRange: ReviewRule = {
   ruleId: 'R002',
@@ -142,7 +138,7 @@ const R002_RatingOutOfRange: ReviewRule = {
   },
 };
 
-// ---------- R003 文本长度过短 ----------
+// 规则 R003：文本长度过短。
 
 const R003_TextTooShort: ReviewRule = {
   ruleId: 'R003',
@@ -174,7 +170,7 @@ const R003_TextTooShort: ReviewRule = {
   },
 };
 
-// ---------- R004 分类字段为空 ----------
+// 规则 R004：分类字段为空。
 
 const R004_CategoryFieldEmpty: ReviewRule = {
   ruleId: 'R004',
@@ -195,7 +191,7 @@ const R004_CategoryFieldEmpty: ReviewRule = {
   },
 };
 
-// ---------- R005 "其他"类别风险 ----------
+// 规则 R005：“其他”类别风险。
 
 const R005_OtherCategoryRisk: ReviewRule = {
   ruleId: 'R005',
@@ -230,7 +226,7 @@ const R005_OtherCategoryRisk: ReviewRule = {
   },
 };
 
-// ---------- R006 评分偏低风险 ----------
+// 规则 R006：评分偏低风险。
 
 const R006_LowRatingRisk: ReviewRule = {
   ruleId: 'R006',
@@ -259,7 +255,7 @@ const R006_LowRatingRisk: ReviewRule = {
   },
 };
 
-// ---------- 规则列表 ----------
+// 内置规则列表。
 
 const builtinRules: ReviewRule[] = [
   R001_RequiredFieldEmpty,
@@ -270,9 +266,7 @@ const builtinRules: ReviewRule[] = [
   R006_LowRatingRisk,
 ];
 
-// =====================================================================
-//  工具函数
-// =====================================================================
+// 工具函数。
 
 /** 判断标注值是否为空 */
 function isEmpty(value: unknown): boolean {
@@ -329,9 +323,7 @@ function generateSummary(status: ReviewStatus, score: number, warnings: FieldWar
   return parts.join('，') + '。';
 }
 
-// =====================================================================
-//  执行引擎
-// =====================================================================
+// 执行引擎。
 
 /** 引擎输入 */
 export interface RunReviewInput {

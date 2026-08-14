@@ -61,7 +61,7 @@ describe('TaskList 冒烟', () => {
     );
   });
 
-  it('挂载时从会话缓存恢复页码（keep-alive 替代语义）', async () => {
+  it('挂载时从会话缓存恢复页码', async () => {
     useListCacheStore.getState().setTaskListCache({ keyword: '', status: null, page: 2 });
     renderTaskList();
 

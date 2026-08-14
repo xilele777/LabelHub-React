@@ -1,7 +1,8 @@
+// 集中定义页面路由、懒加载组件和路由元信息。
 import { lazy, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react';
 import { Role } from '../types';
 
-/** 路由 handle 元信息（等价 Vue RouteMeta），MainLayout 经 useMatches 读取 title */
+/** 路由标题等元信息，布局通过 useMatches 读取。 */
 export interface RouteHandle {
   title: string;
 }
@@ -11,14 +12,11 @@ export interface AsyncRouteConfig {
   name: string;
   title: string;
   roles: Role[];
-  /** 页面组件，一律 React.lazy 懒加载（迁移期的 PlaceholderPage 兜底已随阶段 3 完成移除） */
+  /** 页面组件。页面默认按路由懒加载。 */
   Component: LazyExoticComponent<ComponentType> | ComponentType;
 }
 
-/**
- * 业务路由表（挂在 MainLayout 下）。
- * 阶段 3 迁移页面时：Component 从 null 换成 lazy(() => import('../pages/Xxx'))。
- */
+/** 挂载在主布局下的业务路由。 */
 export const asyncRoutes: AsyncRouteConfig[] = [
   {
     path: 'dashboard',

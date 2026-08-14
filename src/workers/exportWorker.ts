@@ -1,3 +1,4 @@
+// 后台导出线程，负责生成文件内容并返回主线程。
 import { CSV_BOM, ExportFormat, exportRecordsToCsv, type ExportRecord } from '../utils/exportUtils';
 
 export interface ExportWorkerRequest {
@@ -13,7 +14,7 @@ export interface ExportWorkerResponse {
   error?: string;
 }
 
-// Worker 全局对象的最小类型（避免与 DOM lib 的 Window.postMessage 签名冲突）
+// Worker 全局对象的最小类型，避免与 DOM 类型中的 postMessage 冲突。
 const ctx = self as unknown as {
   postMessage(message: ExportWorkerResponse): void;
   addEventListener(

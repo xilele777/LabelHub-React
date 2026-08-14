@@ -1,3 +1,4 @@
+// 通过本地存储协调多个标签页的编辑锁。
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { logger } from '../utils/logger';
 
@@ -45,7 +46,7 @@ export interface UseCrossTabLockReturn {
 export function useCrossTabLock(userId: string): UseCrossTabLockReturn {
   const [lockedByOtherTab, setLockedByOtherTab] = useState(false);
   const [lockedItemId, setLockedItemId] = useState<string | null>(null);
-  // 事件回调里读取当前锁定条目用镜像 ref，避免闭包捕获过期值
+  // 事件回调通过镜像引用读取最新的锁定条目，避免闭包使用旧值。
   const lockedItemIdRef = useRef<string | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const heldRef = useRef<{ itemId: string; userId: string } | null>(null);
@@ -55,7 +56,7 @@ export function useCrossTabLock(userId: string): UseCrossTabLockReturn {
   const getChannel = useCallback((): BroadcastChannel | null => {
     if (typeof BroadcastChannel === 'undefined') return null;
     if (!channelRef.current && userIdRef.current) {
-      // Channel 名称按用户隔离，避免跨用户干扰
+      // 通信频道按用户隔离，避免不同用户互相影响。
       const channel = new BroadcastChannel(`labelhub-lock-${userIdRef.current}`);
       channel.addEventListener('message', (event: MessageEvent<LockMessage>) => {
         const msg = event.data;
@@ -135,7 +136,7 @@ export function useCrossTabLock(userId: string): UseCrossTabLockReturn {
       channelRef.current?.close();
       channelRef.current = null;
     };
-    // userId 变化时重建 channel（getChannel/post 引用稳定，实际依赖 userId）
+    // 用户变化时重建通信频道。
   }, [userId, getChannel, post]);
 
   return {

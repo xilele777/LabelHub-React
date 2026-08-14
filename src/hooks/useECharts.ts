@@ -1,12 +1,12 @@
+// 管理 ECharts 实例的创建、更新、尺寸调整和销毁。
 import { useCallback, useRef } from 'react';
 import * as echarts from 'echarts/core';
 
 /**
  * ECharts 挂载 hook：负责实例生命周期（init/dispose）与容器尺寸自适应（ResizeObserver）。
  *
- * 不引 echarts-for-react，保持现有按需引入优化——echarts.use(...) 按需注册由调用方自己做。
- * containerRef 是 callback ref：容器随条件渲染出现时 init、销毁时 dispose（等价 Vue
- * watch(chartRef) + onBeforeUnmount 组合）；setOption 前置于 init 时会暂存，挂载后自动应用。
+ * 按需注册图表组件由调用方完成。containerRef 负责实例的创建、销毁和尺寸监听；
+ * 容器尚未挂载时传入的配置会在初始化后自动应用。
  */
 export function useECharts() {
   const chartRef = useRef<echarts.ECharts | null>(null);
@@ -27,7 +27,7 @@ export function useECharts() {
     chartRef.current = null;
   }, []);
 
-  /** 全量替换配置（notMerge=true），与 Vue 版 setOption(option, true) 一致 */
+  /** 用新配置完整替换当前图表。 */
   const setOption = useCallback((option: echarts.EChartsCoreOption) => {
     optionRef.current = option;
     chartRef.current?.setOption(option, true);

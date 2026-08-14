@@ -1,3 +1,4 @@
+// 管理标注编辑过程中的实时规则预审结果。
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FieldType, type AnnotationTemplate, type DataItem } from '../../../types';
 import {
@@ -169,7 +170,7 @@ export function useLivePreReview(options: UseLivePreReviewOptions) {
   const [formSnapshot, setFormSnapshot] = useState<Record<string, unknown>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // ── 防抖：formState 变化（React 下即新引用）时延迟提交快照 ──
+  // 表单变化后延迟更新快照，避免逐字触发规则计算。
   useEffect(() => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {

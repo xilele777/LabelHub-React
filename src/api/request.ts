@@ -1,3 +1,4 @@
+// 统一封装 HTTP 请求、鉴权处理、重试和并发去重。
 import axios, {
   type AxiosError,
   type AxiosRequestConfig,
@@ -29,11 +30,11 @@ export interface ApiError<T = unknown> extends Error {
 
 export interface RequestConfig<D = unknown> extends AxiosRequestConfig<D> {
   skipAuth?: boolean;
-  /** Max retry attempts for transient failures (default: 2 for idempotent GET, 0 otherwise) */
+  /** 临时错误的最大重试次数，GET 默认 2 次，写操作默认不重试。 */
   retry?: number;
-  /** Base delay in ms between retries (default: 1000, doubles each attempt) */
+  /** 重试间隔的基础时长，默认 1000 毫秒，每次按指数增加。 */
   retryDelay?: number;
-  /** Set false to opt out of in-flight GET deduplication (default: true) */
+  /** 是否复用相同参数的在途 GET 请求，默认开启。 */
   dedupe?: boolean;
 }
 
@@ -122,14 +123,14 @@ instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// ─── Retry helper ──────────────────────────────────────────
+// 重试条件与退避策略。
 function isRetryableError(error: AxiosError): boolean {
-  // Cancelled requests must never be retried
+  // 已取消的请求不应重试。
   if (axios.isCancel(error)) return false;
-  // Network errors (no response)
+  // 没有响应时通常是网络错误。
   if (!error.response) return true;
   const status = error.response.status;
-  // Retry on server errors and rate limiting
+  // 服务端错误和限流响应可以重试。
   return status >= 500 || status === 429;
 }
 
@@ -173,13 +174,13 @@ instance.interceptors.response.use(
     const config = error.config as RequestConfig | undefined;
     const { maxRetries, baseDelay } = getRetryConfig(config ?? {});
 
-    // Track retry count on the config object
+    // 重试次数记录在请求配置中，随请求一起传递。
     const retryCount =
       (config as Record<string, unknown> & { __retryCount?: number }).__retryCount ?? 0;
 
     if (retryCount < maxRetries && isRetryableError(error)) {
       (config as Record<string, unknown> & { __retryCount: number }).__retryCount = retryCount + 1;
-      // Exponential backoff with jitter: baseDelay * 2^attempt * (0.5-1.0 random)
+      // 使用带随机抖动的指数退避，避免多个请求同时再次冲击服务端。
       const jitter = 0.5 + Math.random() * 0.5;
       const waitMs = baseDelay * Math.pow(2, retryCount) * jitter;
       await delay(waitMs);
@@ -209,10 +210,10 @@ instance.interceptors.response.use(
   },
 );
 
-// ─── In-flight GET deduplication ───────────────────────────
+// 复用相同参数的在途 GET 请求。
 const pendingGets = new Map<string, Promise<ApiResponse<unknown>>>();
 
-/** Build a stable request key from url + params (insensitive to key order). */
+/** 根据 URL 和参数生成与参数顺序无关的请求键。 */
 export function buildRequestKey(url: string, params?: Record<string, unknown>): string {
   if (!params) return url;
   const normalized = Object.keys(params)
@@ -228,8 +229,8 @@ export async function get<T = unknown>(
   params?: Record<string, unknown>,
   config?: RequestConfig,
 ): Promise<ApiResponse<T>> {
-  // 相同 url+params 的在途 GET 共享同一个 Promise，避免重复请求打到后端；
-  // 调用方传入自定义 signal 时跳过去重（取消语义只应作用于发起方自己）
+  // 相同地址和参数的在途请求共享同一个 Promise，避免重复访问服务端；
+  // 调用方传入自定义 signal 时跳过去重，取消只影响当前调用方。
   const shouldDedupe = (config?.dedupe ?? true) && !config?.signal;
   if (!shouldDedupe) {
     return instance.get<ApiResponse<T>, ApiResponse<T>>(url, { params, ...config });

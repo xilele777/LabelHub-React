@@ -1,3 +1,4 @@
+// 任务详情中的标注人员分配面板。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -56,7 +57,7 @@ export default function AnnotationAssignmentPanel({ taskId }: { taskId: string }
   const [items, setItems] = useState<AssignableItem[]>([]);
   const [manualAssignments, setManualAssignments] = useState<Record<string, string>>({});
 
-  // 已编辑但未提交的手动分配不能被后台刷新覆盖（Vue 版靠 reactive 上的 `id in map` 判断）
+  // 保留已编辑但未提交的手动分配，避免被后台刷新覆盖。
   const manualAssignmentsRef = useRef(manualAssignments);
   manualAssignmentsRef.current = manualAssignments;
 

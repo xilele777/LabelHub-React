@@ -1,3 +1,4 @@
+// 应用入口，挂载根组件并加载全局样式。
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import 'antd/dist/reset.css';
@@ -8,7 +9,7 @@ import { setUnauthorizedHandler } from './api/request';
 import { initWebVitals } from './services/webVitals';
 import { logger } from './utils/logger';
 
-// 401 会话过期：跳转登录页并携带回跳地址（等价 Vue main.ts 的 router.replace）
+// 会话过期时回到登录页，并保留当前地址以便登录后返回。
 setUnauthorizedHandler(() => {
   const { location } = router.state;
   if (location.pathname === '/login') return;
@@ -17,7 +18,7 @@ setUnauthorizedHandler(() => {
   void router.navigate(`/login?redirect=${encodeURIComponent(fullPath)}`, { replace: true });
 });
 
-// ─── 全局错误上报（渲染错误由 ErrorBoundary 捕获；这里兜底事件回调/异步错误） ───
+// 生产环境上报未被组件错误边界捕获的全局异常。
 if (import.meta.env.PROD) {
   const report = (message: string, stack: string | undefined, info: string) => {
     try {
@@ -30,7 +31,7 @@ if (import.meta.env.PROD) {
       });
       navigator.sendBeacon('/api/error-report', payload);
     } catch {
-      // Silently fail — error reporting itself should not cause errors.
+      // 上报失败不能影响页面的正常运行。
     }
   };
 
@@ -60,5 +61,5 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Core Web Vitals 采集（仅生产环境上报）
+// 采集核心网页指标，仅在生产环境上报。
 initWebVitals();

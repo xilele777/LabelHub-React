@@ -1,3 +1,4 @@
+// 管理审核工作台的筛选条件和筛选后的数据。
 import { useCallback, useMemo, useState } from 'react';
 import { DataItemStatus, type DataItem } from '../../../types';
 import type { AIReviewResult } from '../../../types/aiReview';
@@ -19,7 +20,7 @@ export interface GroupedItems {
 /**
  * 审核工作台筛选逻辑：筛选状态、派生选项、过滤与分组结果。
  * 关键词过滤使用防抖镜像，避免每次按键触发全量过滤重算。
- * Vue reactive 直接赋值 → React 提供 setFilter(patch) 局部更新。
+ * 通过 setFilter 局部更新筛选条件。
  */
 export function useReviewFilters(
   reviewableItems: DataItem[],

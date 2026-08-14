@@ -1,3 +1,4 @@
+// 请求工具中 GET 去重键生成逻辑的测试。
 import { describe, expect, it } from 'vitest';
 import { buildRequestKey } from '@/api/request';
 

@@ -1,3 +1,4 @@
+// 任务列表、详情和状态更新的全局状态。
 import { create } from 'zustand';
 import { TaskStatus, type TaskItem } from '../types';
 import * as taskApi from '../api/task';

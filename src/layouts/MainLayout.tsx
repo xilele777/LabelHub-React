@@ -1,3 +1,4 @@
+// 主布局，提供导航、用户菜单、通知入口和页面内容区域。
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   App as AntdApp,
@@ -146,7 +147,13 @@ const NAV_ITEMS: NavItem[] = [
     roles: [Role.ADMIN, Role.REVIEWER],
     icon: <ExportOutlined />,
   },
-  { key: 'users', label: '用户管理', path: '/users', roles: [Role.ADMIN], icon: <TeamOutlined /> },
+  {
+    key: 'users',
+    label: '用户管理',
+    path: '/users',
+    roles: [Role.ADMIN],
+    icon: <TeamOutlined />,
+  },
   {
     key: 'notification-publish',
     label: '发通知',
@@ -259,7 +266,7 @@ function formatRelativeTime(timestamp: string): string {
   return new Date(timestamp).toLocaleDateString('zh-CN');
 }
 
-/** 登录会话内只预加载一次模板 schema（等价 Vue router.beforeEach 的一次性预热） */
+/** 每个登录会话只预加载一次模板结构。 */
 let templateSchemasPreloaded = false;
 
 export default function MainLayout() {
@@ -277,7 +284,7 @@ export default function MainLayout() {
   const connected = useNotificationStore((state) => state.connected);
   const notificationStore = useNotificationStore.getState;
 
-  // ≤768px 时自动折叠侧边栏，避免 fixed 定位的 sider 遮挡内容
+  // 小屏幕自动折叠侧边栏，避免固定侧栏遮挡内容。
   const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 768px)').matches);
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 768px)');
@@ -317,7 +324,7 @@ export default function MainLayout() {
 
   const roleInfo = role ? ROLE_META[role] : null;
 
-  // ── 通知 WebSocket 生命周期：跟随登录态连接/断开（等价 Vue watch immediate） ──
+  // 通知连接跟随当前登录状态建立和释放。
   const userId = user?.id;
   useEffect(() => {
     const store = notificationStore();
@@ -345,14 +352,14 @@ export default function MainLayout() {
     return undefined;
   }, [userId, token, notificationStore]);
 
-  // 路由切换时内容区回到顶部（等价 Vue scrollBehavior；实际滚动容器是内容区而非 window）
+  // 路由切换时将实际滚动容器回到顶部。
   const contentRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     contentRef.current?.scrollTo(0, 0);
   }, [location.pathname]);
 
   async function handleLogout() {
-    // 登出前释放当前用户持有的所有标注编辑锁（需在清除会话前调用，携带有效 token）
+    // 清除会话前先释放编辑锁，此时请求仍带有有效凭证。
     await useAnnotationStore.getState().releaseAllMyItems();
     disconnectNotificationWS();
     const store = notificationStore();
@@ -500,8 +507,7 @@ export default function MainLayout() {
   );
 
   return (
-    // AntdApp 挂在 MainLayout（懒加载 chunk）而非入口 App.tsx：
-    // 其 message/notification/Modal 实现链体积大，置于入口会显著拉大首屏预加载
+    // 只在主布局中提供消息、通知和弹窗上下文，避免扩大入口加载体积。
     <AntdApp>
       {/* 无障碍：跳过导航直达内容的隐藏链接（Tab 聚焦时可见） */}
       <a href="#main-content" className="skip-to-content">
@@ -574,8 +580,7 @@ export default function MainLayout() {
             ref={contentRef as React.Ref<HTMLElement>}
           >
             <ErrorBoundary>
-              {/* keep-alive（TaskList/TemplateManage 筛选与滚动状态缓存）React 无原生等价物，
-                  阶段 3 迁移列表页时以 store 持久化筛选状态替代 */}
+              {/* 列表页的筛选条件和滚动位置由各自的 store 保存。 */}
               <div className="labelhub-layout__page" key={location.pathname}>
                 <Suspense fallback={<SkeletonLoader />}>
                   <Outlet />

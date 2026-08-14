@@ -1,3 +1,4 @@
+// 网络状态提示条，展示连接中、在线和离线状态。
 import { DisconnectOutlined, LoadingOutlined, WifiOutlined } from '@ant-design/icons';
 import { useNetworkStatus, type NetworkState } from '../hooks/useNetworkStatus';
 import './NetworkStatusBar.css';

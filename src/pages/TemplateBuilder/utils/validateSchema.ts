@@ -1,3 +1,4 @@
+// 模板字段结构和选项的前端校验工具。
 import { FieldType, type TemplateField, type FieldOption } from '../../../types';
 
 /** Schema 校验结果 */
@@ -37,19 +38,19 @@ function ensureFieldId(id: unknown, index: number): string {
 export function validateImportSchema(raw: unknown): SchemaValidationResult {
   const errors: string[] = [];
 
-  // 1. Top-level must be a non-null object
+  // 1. 顶层必须是非空对象。
   if (raw === null || typeof raw !== 'object') {
     return { valid: false, errors: ['导入内容不是有效的 JSON 对象'], fields: [] };
   }
 
   const data = raw as Record<string, unknown>;
 
-  // 2. fields must be an array
+  // 2. fields 必须是数组。
   if (!Array.isArray(data.fields)) {
     return { valid: false, errors: ['缺少 fields 字段或 fields 不是数组'], fields: [] };
   }
 
-  // 3. Validate each field
+  // 3. 逐项校验字段。
   const sanitizedFields: TemplateField[] = [];
 
   data.fields.forEach((item: unknown, index: number) => {
@@ -60,13 +61,13 @@ export function validateImportSchema(raw: unknown): SchemaValidationResult {
 
     const field = item as Record<string, unknown>;
 
-    // 3a. type is required and must be a known FieldType
+    // 3a. type 必须是已知字段类型。
     if (typeof field.type !== 'string' || !VALID_FIELD_TYPES.has(field.type)) {
       errors.push(`fields[${index}]: type 缺失或不合法 ("${String(field.type)}")，已跳过`);
       return;
     }
 
-    // 3b. Build a safe base
+    // 3b. 先构造一组经过清洗的基础属性。
     const id = ensureFieldId(field.id, index);
     const type = field.type as FieldType;
     const label = typeof field.label === 'string' ? field.label : '';
@@ -77,7 +78,7 @@ export function validateImportSchema(raw: unknown): SchemaValidationResult {
 
     const base = { id, type, fieldKey, label, required, placeholder, description };
 
-    // 3c. Type-specific validation
+    // 3c. 按字段类型校验专属属性。
     switch (type) {
       case FieldType.INPUT: {
         const maxLength = typeof field.maxLength === 'number' ? field.maxLength : undefined;

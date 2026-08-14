@@ -1,3 +1,4 @@
+// 防抖 Hook 的延迟更新与清理测试。
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useDebounced } from '@/hooks/useDebounced';
@@ -60,7 +61,7 @@ describe('useDebounced', () => {
     expect(result.current).toBe('ab');
   });
 
-  it('支持对象属性作为 source（Vue 版 getter 的等价用法）', () => {
+  it('支持对象属性作为输入值', () => {
     const filters: { keyword?: string } = { keyword: 'x' };
     const { result, rerender } = setup(filters.keyword, 100);
     expect(result.current).toBe('x');

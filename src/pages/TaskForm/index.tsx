@@ -1,3 +1,4 @@
+// 任务新建和编辑页面，维护任务基本信息与模板选择。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -87,7 +88,7 @@ export default function TaskForm() {
 
   const loading = taskLoading || templateLoading || optionsLoading;
 
-  // 模板下拉随任务类型联动（Vue 版为 computed(formState.type)）
+  // 模板选项随任务类型联动。
   const selectedType = Form.useWatch('type', form);
   const templateOptions = useMemo(
     () =>
@@ -121,7 +122,7 @@ export default function TaskForm() {
     ]);
   }, [loadOwners]);
 
-  // 编辑态：任务数据到达（或被其他操作刷新）后回填表单，等价 Vue watch(editingTask)
+  // 编辑数据加载或刷新后回填表单。
   useEffect(() => {
     if (!editingTask) return;
     form.setFieldsValue({
@@ -217,7 +218,7 @@ export default function TaskForm() {
             autoComplete="off"
             onFinish={(values) => void handleSubmit(values)}
             onValuesChange={(changed: Partial<TaskFormValues>) => {
-              // 任务类型变更后原模板可能不再匹配，清空绑定（等价 Vue @change）
+              // 任务类型变化后原模板可能不再匹配，清空绑定。
               if ('type' in changed) form.setFieldValue('templateId', undefined);
             }}
           >

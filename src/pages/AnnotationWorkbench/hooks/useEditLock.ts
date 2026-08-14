@@ -1,3 +1,4 @@
+// 为当前标注项申请、续期并释放编辑锁。
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseEditLockOptions {
@@ -61,7 +62,7 @@ export function useEditLock(options: UseEditLockOptions) {
     void enqueue(() => syncLock(itemId, enabled));
   }, [itemId, enabled, enqueue, syncLock]);
 
-  // 卸载时释放持有的锁（等价 Vue onBeforeUnmount）
+  // 卸载时释放当前持有的锁。
   useEffect(() => {
     return () => {
       void enqueue(() => syncLock(null, false));

@@ -1,5 +1,4 @@
-/* Vue scoped 样式的等价迁移：全部收敛到 .dashboard-page 作用域下，避免与其他页面同名类冲突。
-   metric-card / panel-card 的基础外观已在 global.css 定义，这里只放页面特有的差异。 */
+/* 仪表盘样式限定在页面根节点下，避免与其他页面重名。 */
 
 .dashboard-page .role-tag {
   margin-left: 8px;
