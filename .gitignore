@@ -33,7 +33,11 @@ npm-debug.log*
 logs/
 
 # Docs (local only — product/API/perf notes, interview prep, resume drafts)
-docs/
+# 注意用 docs/* 而非 docs/：父目录被整体排除后，git 不会递归进去，
+# 下面的 ! 重新包含规则将失效。
+docs/*
+# 例外：技术设计文档公开留档
+!docs/superpowers/
 
 # Generated
 src/components.d.ts
