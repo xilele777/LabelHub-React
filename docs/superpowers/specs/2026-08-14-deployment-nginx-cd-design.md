@@ -132,7 +132,7 @@ location /socket.io/ {
 
 ### 5.4 真实 IP 透传（必须与后端联动）
 
-Nginx 传 `X-Forwarded-For` / `X-Forwarded-Proto`，同时服务器 `.env` 必须设置 `TRUST_PROXY=true`。
+Nginx 传 `X-Forwarded-For` / `X-Forwarded-Proto`，同时后端必须设置 `TRUST_PROXY=true`（非密钥项，由 `ecosystem.config.js` 的 `env` 块提供）。
 
 [server/index.js:45](../../../server/index.js#L45) 是 `app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false)`，默认关闭。若只加 Nginx 而不开这个开关，`globalLimiter` 看到的每个请求来源都是 `127.0.0.1`，单个用户触发登录限流会导致全站被锁。**这两项必须同时生效，缺一即为线上故障。**
 
@@ -224,15 +224,45 @@ GitHub 托管 runner 的出口 IP 落在 Azure 全球 IP 段（数千个 CIDR �
 - `DB_TYPE: 'sqlite'`
 - 新增 `TRUST_PROXY: 'true'`
 - **移除 `CORS_ORIGIN: 'http://localhost:3000'` 硬编码**——它与 commit 7b13298 修复的 Socket.IO CORS 问题同源，留着即是下一颗雷
+- `node_args` 增加 `--env-file=.env`（见 §7.1）
+- `env` 块只放非密钥项；`HMAC_SECRET` / `CORS_ORIGIN` 一律由 `.env` 提供，不写进本文件
 - `wait_ready: true` **保留**：[server/index.js:223-224](../../../server/index.js#L223-L224) 确实在 listen 回调中发送了 ready 信号，该配置有效，且能保证 pm2 报告 online 时服务已真正就绪
 
-### 7.1 服务器 `.env` 的 CORS_ORIGIN 必须同步改
+### 7.1 `.env` 从未被加载——必须先修的地基
+
+线上实测（2026-08-14）发现：`/root/LabelHub/.env` 存在且含两个正确的键，但**它从创建至今一次都没有被读取过**。证据三条：
+
+1. 进程 `/proc/<pid>/environ` 完整解析后，业务变量（`NODE_ENV`/`HMAC_SECRET`/`CORS_ORIGIN`/`PORT`/`TRUST_PROXY`/`DB_TYPE`）**一个都不存在**，仅有 pm2 元数据与启动它的那个 SSH 会话继承的变量；
+2. 前后端 `node_modules` 中**均未安装 `dotenv`**；
+3. 服务端代码中无任何 `dotenv` 引用。
+
+当前生产的真实运行状态因此是：
+
+| 代码位置                                                    | 设计意图           | 线上实际                                                  |
+| ----------------------------------------------------------- | ------------------ | --------------------------------------------------------- |
+| [auth.js:19-28](../../../server/middleware/auth.js#L19-L28) | 用 `.env` 随机密钥 | `NODE_ENV` 未设 → 落到兜底分支，**使用硬编码的 dev 密钥** |
+| [index.js:47-76](../../../server/index.js#L47-L76)          | 白名单线上来源     | 落到 dev 分支，白名单为 `localhost:3000`                  |
+| `securityHeaders` / `logger`                                | 生产模式           | 均为 dev 分支（宽松安全头 + debug 级 pretty 日志）        |
+
+第一行是**可利用的鉴权漏洞**：仓库公开，token 格式 `base64(userId:timestamp:hmac)` 与该 dev 密钥均可从代码中直接读到，任何人可为任意 `userId` 伪造合法 token。数据为演示数据，影响可控，但性质上是真实绕过。
+
+CORS 目前未表现为故障，是因为前后端同源（同一个 `:3001`），浏览器不发起跨域校验；该错误配置一直被同源掩盖着。
+
+**修复方式：Node 原生 `--env-file`，不引入 `dotenv`。** 服务器 Node v22.23.1 已实测支持（同时支持 `--env-file-if-exists`）。在 `ecosystem.config.js` 的 `node_args` 中加 `--env-file=.env`，配合 `cwd` 指向 release 根目录，即读到 `.env -> shared/.env`。
+
+选它而非 `dotenv` 的理由：零新依赖；无需改动 `server/index.js` 的 require 顺序；密钥不进 `env` 块，因而不会被 `pm2 save` 明文写入 `~/.pm2/dump.pm2`；`pm2 restart` 天然重新读文件。
+
+连带纠正一条长期错误记载：DEPLOY.md 所记「`pm2 restart` 不重载 `.env`，必须加 `--update-env`」并非事实——真实原因是从来没有任何代码读取该文件，加不加 `--update-env` 结果相同。
+
+**副作用（预期行为，非缺陷）：** 启用真实 `HMAC_SECRET` 后，此前用 dev 密钥签发的 token 全部失效，所有已登录会话需重新登录。
+
+### 7.2 服务器 `.env` 的 CORS_ORIGIN 必须同步改
 
 线上 `.env` 实测为：
 
 ```
 HMAC_SECRET=<略>
-CORS_ORIGIN=http://8.148.12.128:3001
+CORS_ORIGIN=http://<公网IP>:3001
 ```
 
 访问入口从 `:3001` 移到 80 端口后，该值必须改为 `http://<公网IP>`（无端口号）。commit 7b13298 让 Socket.IO 复用 Express 的 CORS 配置，因此这个值一旦与实际访问来源不符，**WebSocket 握手会被拒绝，实时协作功能直接失效**——且 HTTP 接口仍正常，故障表现具有迷惑性。
@@ -257,40 +287,43 @@ CORS_ORIGIN=http://8.148.12.128:3001
 
 ## 9. 风险与缓解
 
-| 风险                                                  | 影响               | 缓解                                                                                     |
-| ----------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
-| 数据目录迁移丢失 SQLite 数据                          | 严重，不可逆       | **必须用 WAL 感知的备份方式**（见 §4.3），不可用 `cp *.db`；迁移后逐表核对行数再删旧目录 |
-| Nginx 配置错误导致站点不可用                          | 高                 | `nginx -t` 预检；3001 保持开放直至全链路验证通过                                         |
-| 只加 Nginx 未开 `TRUST_PROXY`                         | 高（限流误封全站） | 列为同一次变更的强制项，smoke 脚本外补充一次限流行为人工确认                             |
-| GitHub Actions 出口 IP 不固定，安全组限制 22 端口来源 | 中（CD 连不上）    | 已定方案：22 放行 0.0.0.0/0 + §6.7 四项硬化                                              |
-| 22 暴露公网后遭密码爆破                               | 高                 | 硬化四项必须**先于**安全组放开执行；`PasswordAuthentication no` + fail2ban               |
-| SQLite 无备份机制                                     | 中（数据不可恢复） | DEPLOY.md 记载的 crontab 实测从未配置；本次一并补上 WAL 感知的每日备份                   |
-| CD 上线后误 push 触发意外部署                         | 中                 | 门禁四关 + 健康检查回滚兜底；工作区现有 3 个未提交改动需先行处理                         |
-| release 目录堆积占满磁盘                              | 低                 | 部署末尾保留最近 5 个，其余清理                                                          |
+| 风险                                                  | 影响               | 缓解                                                                                                                                                                          |
+| ----------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 数据目录迁移丢失 SQLite 数据                          | 严重，不可逆       | **必须用 WAL 感知的备份方式**（见 §4.3），不可用 `cp *.db`；迁移后逐表核对行数再删旧目录                                                                                      |
+| Nginx 配置错误导致站点不可用                          | 高                 | `nginx -t` 预检；3001 保持开放直至全链路验证通过                                                                                                                              |
+| 只加 Nginx 未开 `TRUST_PROXY`                         | 高（限流误封全站） | 列为同一次变更的强制项，smoke 脚本外补充一次限流行为人工确认                                                                                                                  |
+| GitHub Actions 出口 IP 不固定，安全组限制 22 端口来源 | 中（CD 连不上）    | 已定方案：22 放行 0.0.0.0/0 + §6.7 四项硬化                                                                                                                                   |
+| 22 暴露公网后遭密码爆破                               | 高                 | 硬化四项必须**先于**安全组放开执行；`PasswordAuthentication no` + fail2ban                                                                                                    |
+| SQLite 无备份机制                                     | 中（数据不可恢复） | DEPLOY.md 记载的 crontab 实测从未配置；本次一并补上 WAL 感知的每日备份                                                                                                        |
+| CD 上线后误 push 触发意外部署                         | 中                 | 门禁四关 + 健康检查回滚兜底；工作区现有 3 个未提交改动需先行处理                                                                                                              |
+| release 目录堆积占满磁盘                              | 低                 | 部署末尾保留最近 5 个，其余清理                                                                                                                                               |
+| `NODE_ENV=production` 生效后进程启动即崩溃            | 高（部署直接失败） | [auth.js:24](../../../server/middleware/auth.js#L24) 与 [index.js:68](../../../server/index.js#L68) 两处 throw 要求密钥必须真正注入；先用 `--env-file` 修好 §7.1 再切生产模式 |
+| 启用真实 `HMAC_SECRET` 后现存会话全部失效             | 低                 | 预期行为（见 §7.1），非缺陷；验收时以「重新登录成功」为准，不视作回归                                                                                                         |
 
 ## 10. 实施前置检查（已于 2026-08-14 完成）
 
 服务器实测结果，全部符合本设计的前提假设：
 
-| 检查项        | 实测结果                                                           | 对设计的影响                              |
-| ------------- | ------------------------------------------------------------------ | ----------------------------------------- |
-| `/root` 权限  | `drwx------`（700）                                                | 确认 §4.2 迁移到 `/srv/labelhub` 是必需的 |
-| Nginx         | 未安装                                                             | 需 `apt install nginx`（apt 源实测可用）  |
-| 80 / 443 端口 | 空闲                                                               | 无冲突                                    |
-| 3001 监听     | `*:3001`（即 `0.0.0.0`）                                           | 确认 §5.6 需改为绑定 `127.0.0.1`          |
-| 磁盘          | 40G 总量，已用 8.2G，余 30G                                        | 充足，可放多个 release                    |
-| 内存          | 1.6G，已用 501M，可用 1.1G（swap 4G）                              | 可容纳 Nginx + fail2ban                   |
-| 运行时        | Node v22.23.1 / npm 10.9.8 / pm2 7.0.3（`/usr/bin/pm2`）           | pm2 全局可用，`deploy` 用户可直接调用     |
-| pm2 现状      | `labelhub` fork 单进程，root 运行，`pm2-root.service` 已 enabled   | 换 `deploy` 用户后需重做 `pm2 startup`    |
-| SQLite        | `journal_mode=wal`，主库 208KB，**WAL 4.1MB**                      | 见 §4.3，备份方式必须改                   |
-| `.env`        | 含 `HMAC_SECRET`、`CORS_ORIGIN=http://8.148.12.128:3001`           | 见 §7.1，CORS_ORIGIN 必须改               |
-| `/srv`        | 已存在，内有阿里云安骑士诱饵目录 `.maegis` / `.zaegis` / `.~aegis` | 与 `/srv/labelhub` 互不干扰，无需处理     |
-| sshd          | `PasswordAuthentication yes`、`PermitRootLogin yes`                | 见 §6.7，放开 22 前必须先硬化             |
-| 普通用户      | 无（UID ≥ 1000 为空）                                              | 需新建 `deploy` 用户                      |
-| fail2ban      | 未安装                                                             | 需安装                                    |
-| 安全组入方向  | 3001 对 `0.0.0.0/0` 开放；22 仅放行单个 IP；**80 无规则**          | 需新增 80 规则、改 22 规则、删 3001 规则  |
-| 备份          | 无 `/root/backup`，`crontab -l` 为空                               | DEPLOY.md 记载的每日备份从未生效，见 §9   |
-| 工作区        | 干净，HEAD = `7b13298`                                             | 无未提交改动干扰                          |
+| 检查项        | 实测结果                                                                                                             | 对设计的影响                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `/root` 权限  | `drwx------`（700）                                                                                                  | 确认 §4.2 迁移到 `/srv/labelhub` 是必需的                        |
+| Nginx         | 未安装                                                                                                               | 需 `apt install nginx`（apt 源实测可用）                         |
+| 80 / 443 端口 | 空闲                                                                                                                 | 无冲突                                                           |
+| 3001 监听     | `*:3001`（即 `0.0.0.0`）                                                                                             | 确认 §5.6 需改为绑定 `127.0.0.1`                                 |
+| 磁盘          | 40G 总量，已用 8.2G，余 30G                                                                                          | 充足，可放多个 release                                           |
+| 内存          | 1.6G，已用 501M，可用 1.1G（swap 4G）                                                                                | 可容纳 Nginx + fail2ban                                          |
+| 运行时        | Node v22.23.1 / npm 10.9.8 / pm2 7.0.3（`/usr/bin/pm2`）                                                             | pm2 全局可用，`deploy` 用户可直接调用                            |
+| pm2 现状      | `labelhub` fork 单进程，root 运行，`pm2-root.service` 已 enabled                                                     | 换 `deploy` 用户后需重做 `pm2 startup`                           |
+| SQLite        | `journal_mode=wal`，主库 208KB，**WAL 4.1MB**                                                                        | 见 §4.3，备份方式必须改                                          |
+| `.env`        | 含 `HMAC_SECRET`、`CORS_ORIGIN=http://<公网IP>:3001`，但**从未被加载**（未装 dotenv，进程 environ 中无任何业务变量） | 见 §7.1，须用 `--env-file` 使其生效；见 §7.2，CORS_ORIGIN 必须改 |
+| 实际运行模式  | `NODE_ENV` 未设 → 生产实为 dev 分支，**HMAC 用硬编码 dev 密钥**                                                      | 见 §7.1，属可利用的鉴权漏洞，本次一并修复                        |
+| `/srv`        | 已存在，内有阿里云安骑士诱饵目录 `.maegis` / `.zaegis` / `.~aegis`                                                   | 与 `/srv/labelhub` 互不干扰，无需处理                            |
+| sshd          | `PasswordAuthentication yes`、`PermitRootLogin yes`                                                                  | 见 §6.7，放开 22 前必须先硬化                                    |
+| 普通用户      | 无（UID ≥ 1000 为空）                                                                                                | 需新建 `deploy` 用户                                             |
+| fail2ban      | 未安装                                                                                                               | 需安装                                                           |
+| 安全组入方向  | 3001 对 `0.0.0.0/0` 开放；22 仅放行单个 IP；**80 无规则**                                                            | 需新增 80 规则、改 22 规则、删 3001 规则                         |
+| 备份          | 无 `/root/backup`，`crontab -l` 为空                                                                                 | DEPLOY.md 记载的每日备份从未生效，见 §9                          |
+| 工作区        | 干净，HEAD = `7b13298`                                                                                               | 无未提交改动干扰                                                 |
 
 附带发现（不影响本次实施）：`aegis.service` 自 2026-08-12 起处于 failed 状态，但 `aegis_client` 子进程仍在运行。
 
@@ -307,4 +340,6 @@ CORS_ORIGIN=http://8.148.12.128:3001
 9. pm2 进程以 `deploy` 用户运行，`pm2-deploy.service` 已 enabled；`deploy` 无 root 权限（仅 `systemctl reload nginx` 一项 sudo）
 10. 数据迁移后七张表行数与 §4.3 基线完全一致
 11. WAL 感知的每日备份 crontab 生效，且产出的快照可被独立打开并读出正确行数
-12. WebSocket 实时功能可用（验证 §7.1 的 CORS_ORIGIN 已正确更新）
+12. WebSocket 实时功能可用（验证 §7.2 的 CORS_ORIGIN 已正确更新）
+13. 进程 environ 中确实含 `NODE_ENV=production`、`HMAC_SECRET`、`CORS_ORIGIN`、`TRUST_PROXY=true`（验证 §7.1 的 `--env-file` 生效）
+14. 用硬编码 dev 密钥伪造的 token 被拒绝（401），确认鉴权漏洞已闭合
