@@ -1,8 +1,22 @@
 # LabelHub 部署升级设计：Nginx 网关 + GitHub Actions CD
 
 - 日期：2026-08-14
-- 状态：待实施
+- 状态：**已实施并验收通过**（2026-08-14，首次 CD 部署 release `20260814-0fa278d`）
 - 关联：[DEPLOY.md](../../../DEPLOY.md)（运维手册，gitignore）、[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)
+
+## 0. 实施记录（2026-08-14）
+
+14 条验收标准全部通过。实施中新发现并一并修复的问题：
+
+| 发现                                                                    | 处理                                                               |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `.env` 从未被任何代码读取，生产实际跑在 dev 分支、HMAC 用公开的兜底密钥 | 改用 Node 原生 `--env-file`（见 §7.1），伪造 token 已实测返回 401  |
+| `ecosystem.config.js` 在 `"type": "module"` 下加载为空对象              | 改名 `ecosystem.config.cjs`（见 §7）                               |
+| ESLint 的 `*.config.{js,mjs,ts}` 规则不含 `cjs`，改名后 CI 变红         | 补上 `cjs` 扩展名                                                  |
+| `npm ci` 每次部署耗时约 2 分钟                                          | `package-lock.json` 未变时从上个 release 硬链接复用 `node_modules` |
+| 旧文档记载的每日备份 crontab 实测从未生效                               | 重新配置并验证；首次写入因 `set -e` 下 `grep -v` 返回 1 而静默失败 |
+
+回滚能力已实测：注入启动失败的 release 后，健康检查捕获 502 并自动切回上一版本，复验五项全绿，脚本以退出码 1 结束。
 
 ## 1. 背景
 
@@ -343,5 +357,5 @@ CORS_ORIGIN=http://<公网IP>:3001
 10. 数据迁移后七张表行数与 §4.3 基线完全一致
 11. WAL 感知的每日备份 crontab 生效，且产出的快照可被独立打开并读出正确行数
 12. WebSocket 实时功能可用（验证 §7.2 的 CORS_ORIGIN 已正确更新）
-13. 进程 environ 中确实含 `NODE_ENV=production`、`HMAC_SECRET`、`CORS_ORIGIN`、`TRUST_PROXY=true`（验证 §7.1 的 `--env-file` 生效）
+13. 生产模式真正生效：进程 environ 含 `NODE_ENV=production` 与 `TRUST_PROXY=true`；`HMAC_SECRET` / `CORS_ORIGIN` 不会出现在 environ 中（`--env-file` 是 Node 运行时注入 `process.env`，而 `/proc/<pid>/environ` 是 execve 时的初始快照），其生效判据为**进程能在 production 下持续运行**——否则 [auth.js:24](../../../server/middleware/auth.js#L24) 与 [index.js:68](../../../server/index.js#L68) 两处 throw 必然使其崩溃；`CORS_ORIGIN` 取值另以 CORS 响应头行为验证
 14. 用硬编码 dev 密钥伪造的 token 被拒绝（401），确认鉴权漏洞已闭合
