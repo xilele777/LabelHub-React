@@ -1,10 +1,11 @@
+/** 登录失败限流：优先使用 Redis，多进程不可用时退回内存计数。 */
 import type { Request, Response, NextFunction } from 'express';
 import { getRedis } from '../utils/redis';
 
 const WINDOW_MS = Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const MAX_FAILED_ATTEMPTS = Number(process.env.LOGIN_RATE_LIMIT_MAX || 5);
 
-// Extend Express Request
+// 扩展 Express Request 类型。
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
@@ -17,7 +18,7 @@ declare global {
   }
 }
 
-// ─── In-memory store (default) ────────────────────────────
+// 内存计数器（默认兜底）。
 
 interface RateRecord {
   count: number;
@@ -40,7 +41,7 @@ function getRecord(key: string, now: number): RateRecord {
   return record;
 }
 
-// ─── Redis store (optional) ───────────────────────────────
+// Redis 计数器（可选）。
 
 interface RedisStore {
   getCount(key: string): Promise<number>;
@@ -87,7 +88,7 @@ function getRedisStore(): RedisStore | null {
   }
 }
 
-// ─── Middleware ────────────────────────────────────────────
+// 登录限流中间件。
 
 async function redisLimit(
   store: RedisStore,

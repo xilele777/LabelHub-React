@@ -1,3 +1,4 @@
+/** 用户管理接口：查询、创建、编辑、改密和删除用户。 */
 const express = require('express');
 const db = require('../store/db');
 const { requireAuth, requireRole } = require('../middleware/auth');

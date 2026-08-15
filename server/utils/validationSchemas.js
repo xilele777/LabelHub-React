@@ -1,11 +1,9 @@
 /**
- * 关键路由的 Zod 校验 Schema。
- *
- * 覆盖：auth（登录）、annotation-items（提交/驳回）、tasks（创建/状态变更）。
+ * 关键路由的 Zod 请求校验规则，覆盖登录、标注操作和任务状态变更。
  */
 const { z } = require('zod');
 
-// ── Auth ─────────────────────────────────────────────────
+// 登录和用户相关参数。
 
 const loginSchema = z.object({
   username: z
@@ -18,7 +16,7 @@ const loginSchema = z.object({
     .max(100, '密码过长'),
 });
 
-// ── Annotation Items ────────────────────────────────────
+// 标注项参数。
 
 /** 提交标注 */
 const submitAnnotationSchema = z.object({
@@ -47,7 +45,7 @@ const rejectSchema = z.object({
   version: z.number({ required_error: '版本号缺失' }).int().min(1),
 });
 
-// ── Tasks ───────────────────────────────────────────────
+// 任务参数。
 
 const createTaskSchema = z.object({
   name: z.string({ required_error: '任务名称不能为空' }).min(1).max(200),
@@ -60,7 +58,7 @@ const updateTaskStatusSchema = z.object({
   status: z.enum(['draft', 'pending', 'in_progress', 'completed', 'ended']),
 });
 
-// ── Users ───────────────────────────────────────────────
+// 用户参数。
 
 const createUserSchema = z.object({
   username: z.string({ required_error: '用户名不能为空' }).min(1).max(50),

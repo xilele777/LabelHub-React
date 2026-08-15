@@ -1,3 +1,4 @@
+/** 标注任务接口：任务 CRUD、状态流转和任务可见性控制。 */
 const express = require('express');
 const createCrudRouter = require('./crudFactory');
 const db = require('../store/db');

@@ -1,15 +1,5 @@
 /**
- * Pino 结构化日志单例
- *
- * 用法:
- *   const { logger, childLogger } = require('../utils/logger');
- *   logger.info({ action: 'login', userId: 'xxx' }, '用户登录成功');
- *   const log = childLogger(req);
- *   log.info('请求处理完成');
- *
- * 环境变量:
- *   LOG_LEVEL    — 日志级别（默认: 'info'，开发模式: 'debug'）
- *   NODE_ENV     — 生产环境输出 JSON，开发环境输出彩色文本
+ * Pino 结构化日志单例，统一处理日志级别、开发输出和请求上下文。
  */
 
 const pino = require('pino');

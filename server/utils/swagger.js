@@ -1,8 +1,5 @@
 /**
- * Swagger / OpenAPI 3.0 配置
- *
- * 使用 swagger-jsdoc 从 JSDoc 注释自动生成 API 文档。
- * 访问路径: /api/docs
+ * Swagger/OpenAPI 文档配置，由入口挂载到 /api/docs。
  */
 
 const swaggerJsdoc = require('swagger-jsdoc');

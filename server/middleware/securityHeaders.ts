@@ -1,3 +1,4 @@
+/** 设置浏览器安全响应头，并根据环境生成 CSP 和 HSTS。 */
 import type { Request, Response, NextFunction } from 'express';
 
 export default function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
@@ -6,7 +7,7 @@ export default function securityHeaders(_req: Request, res: Response, next: Next
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
-  // Content-Security-Policy: restrict script/styles/font sources
+  // 限制脚本、样式、字体和连接来源。
   const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'",

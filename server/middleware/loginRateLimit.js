@@ -1,7 +1,8 @@
+/** 登录失败限流：优先使用 Redis，多进程不可用时退回内存计数。 */
 const WINDOW_MS = Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const MAX_FAILED_ATTEMPTS = Number(process.env.LOGIN_RATE_LIMIT_MAX || 5);
 
-// ─── In-memory store (default) ────────────────────────────
+// 内存计数器（默认兜底）。
 const attempts = new Map();
 
 function getAttemptKey(req) {
@@ -18,7 +19,7 @@ function getRecord(key, now) {
   return record;
 }
 
-// ─── Redis store (optional) ───────────────────────────────
+// Redis 计数器（可选）。
 
 let redisStore = null;
 
@@ -42,7 +43,7 @@ function getRedisStore() {
       async increment(key) {
         const redisKey = `ratelimit:login:${key}`;
         const ttlSeconds = Math.ceil(WINDOW_MS / 1000);
-        // Use multi for atomic INCR + EXPIRE
+        // 使用 multi 保证计数和过期时间一起写入。
         const count = await redis.multi().incr(redisKey).expire(redisKey, ttlSeconds).exec();
         return count ? Number(count[0][1]) : 1;
       },
@@ -63,17 +64,17 @@ function getRedisStore() {
   }
 }
 
-// ─── Middleware ────────────────────────────────────────────
+// 登录限流中间件。
 
 function loginRateLimit(req, res, next) {
   const store = getRedisStore();
 
   if (store) {
-    // ── Redis mode ──────────────────────────────────────
+    // Redis 模式。
     return redisLimit(store, req, res, next);
   }
 
-  // ── In-memory mode (fallback) ────────────────────────
+  // 内存模式。
   return memoryLimit(req, res, next);
 }
 

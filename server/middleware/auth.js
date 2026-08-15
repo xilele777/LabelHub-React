@@ -1,19 +1,11 @@
+/**
+ * 基于 HMAC 令牌完成请求鉴权，并将当前用户挂载到请求对象。
+ * 同时支持 httpOnly Cookie 和 Authorization 头，密码变更后旧令牌立即失效。
+ */
 const crypto = require('crypto');
 const db = require('../store/db');
 
-/**
- * HMAC-signed token-based auth middleware.
- *
- * Token format: base64(userId:timestamp:hmacSignature)
- * The HMAC signature prevents token forgery — attackers cannot craft
- * valid tokens without the secret key, even if they know the format.
- *
- * This middleware checks the Authorization header:  Bearer <token>
- *
- * For production, consider replacing with proper JWT + RSA keys.
- */
-
-// Token expiration: 24 hours (in milliseconds)
+// 令牌有效期：24 小时。
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 function getTokenSecret() {
@@ -39,24 +31,24 @@ function encodeToken(userId) {
 function decodeToken(token) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf-8');
-    // token format: userId:timestamp:hmacSignature
+    // 令牌格式：userId:timestamp:hmacSignature。
     const parts = decoded.split(':');
-    if (parts.length !== 3) return null; // Malformed token
+    if (parts.length !== 3) return null;
 
     const [userId, tsStr, signature] = parts;
     const timestamp = Number(tsStr);
     if (isNaN(timestamp)) return null;
 
-    // Verify HMAC signature to prevent forgery
+    // 校验签名，防止伪造或篡改。
     const payload = `${userId}:${timestamp}`;
     const expectedSig = crypto.createHmac('sha256', HMAC_SECRET).update(payload).digest('hex');
     if (signature !== expectedSig) {
-      return null; // Invalid signature — token was tampered with
+      return null;
     }
 
-    // Check token expiration
+    // 检查是否过期。
     if (Date.now() - timestamp > TOKEN_EXPIRY_MS) {
-      return null; // Token expired
+      return null;
     }
     return { userId, timestamp };
   } catch {
@@ -65,15 +57,13 @@ function decodeToken(token) {
 }
 
 /**
- * Auth middleware – attaches req.currentUser if valid token present.
- * Checks httpOnly cookie first, then Authorization header.
- * Does NOT block unauthenticated requests (sets currentUser to null).
+ * 解析令牌并将不含密码的用户信息写入 req.currentUser；未登录请求继续向后传递。
  */
 function authMiddleware(req, res, next) {
-  // Primary: httpOnly cookie (XSS-safe)
+  // 优先读取 httpOnly Cookie。
   let token = req.cookies?.token || null;
 
-  // Fallback: Authorization header (for API clients)
+  // API 客户端使用 Authorization 头作为兜底。
   if (!token) {
     const authHeader = req.headers.authorization || '';
     const match = authHeader.match(/^Bearer\s+(.+)$/);
@@ -99,7 +89,7 @@ function authMiddleware(req, res, next) {
     return next();
   }
 
-  // If password was changed after token was issued, invalidate the token
+  // 密码变更后签发的旧令牌全部失效。
   if (user.passwordChangedAt) {
     const changedAt = new Date(user.passwordChangedAt).getTime();
     if (decoded.timestamp < changedAt) {
@@ -108,14 +98,14 @@ function authMiddleware(req, res, next) {
     }
   }
 
-  // Attach user info (without password) to request
+  // 不把密码字段暴露给后续处理逻辑。
   const { password, ...userInfo } = user;
   req.currentUser = userInfo;
   next();
 }
 
 /**
- * Strict auth – requires a valid token, returns 401 otherwise.
+ * 强制鉴权：没有有效用户时返回 401。
  */
 function requireAuth(req, res, next) {
   if (!req.currentUser) {
@@ -125,7 +115,7 @@ function requireAuth(req, res, next) {
 }
 
 /**
- * Role-based access control.
+ * 角色鉴权：要求当前用户属于指定角色之一。
  */
 function requireRole(...roles) {
   return (req, res, next) => {

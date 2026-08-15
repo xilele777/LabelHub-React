@@ -11,19 +11,19 @@
 
 const client = require('prom-client');
 
-// ─── Default labels ───────────────────────────────────────
+// 默认标签。
 const defaultLabels = {
   app: 'labelhub',
 };
 client.register.setDefaultLabels(defaultLabels);
 
-// ─── Collect default metrics (CPU, memory, event loop) ────
+// Node.js 默认指标。
 client.collectDefaultMetrics({
   prefix: 'labelhub_',
   gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
 });
 
-// ─── Custom metrics ───────────────────────────────────────
+// HTTP 指标。
 const httpRequestDuration = new client.Histogram({
   name: 'http_request_duration_seconds',
   help: 'HTTP request latency in seconds',
@@ -42,9 +42,9 @@ const httpRequestsInFlight = new client.Gauge({
   help: 'Current number of HTTP requests being processed',
 });
 
-// ─── Middleware ───────────────────────────────────────────
+// 指标中间件。
 function metricsMiddleware(req, res, next) {
-  // Skip metrics endpoint itself to avoid recursion
+  // 排除监控接口自身，避免指标统计递归。
   if (req.path === '/api/metrics' || req.path === '/api/health') {
     return next();
   }
@@ -52,7 +52,7 @@ function metricsMiddleware(req, res, next) {
   const start = process.hrtime.bigint();
   httpRequestsInFlight.inc();
 
-  // Capture the route once the response finishes
+  // 响应完成后记录最终路由和状态码。
   res.on('finish', () => {
     httpRequestsInFlight.dec();
 
@@ -68,7 +68,7 @@ function metricsMiddleware(req, res, next) {
   next();
 }
 
-// ─── Metrics endpoint ─────────────────────────────────────
+// 指标端点。
 async function metricsEndpoint(_req, res) {
   try {
     res.set('Content-Type', client.register.contentType);

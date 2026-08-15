@@ -1,3 +1,4 @@
+/** 监控数据接收、系统统计和运行状态相关接口。 */
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../store/db');
@@ -5,8 +6,7 @@ const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
-// navigator.sendBeacon 以 text/plain 发送字符串 payload（不带 Authorization 头），
-// 全局 express.json 不会解析该类型，这里单独用文本解析器兜底
+// sendBeacon 使用 text/plain 且不带 Authorization 头，因此单独解析文本请求体。
 const textParser = express.text({ type: () => true, limit: '64kb' });
 
 function parsePayload(body) {
@@ -37,7 +37,7 @@ router.post('/error-report', textParser, (req, res) => {
   res.status(204).end();
 });
 
-// ─── Core Web Vitals 采集与查询 ─────────────────────────────
+// Core Web Vitals 采集与查询。
 const VITAL_NAMES = new Set(['LCP', 'INP', 'CLS', 'FCP', 'TTFB']);
 const MAX_ROWS = 50_000;
 

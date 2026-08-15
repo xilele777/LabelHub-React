@@ -1,3 +1,4 @@
+/** 密码哈希、校验及旧明文密码的兼容升级逻辑。 */
 const crypto = require('crypto');
 
 const HASH_ALGORITHM = 'scrypt';

@@ -1,3 +1,4 @@
+/** 定时扫描任务和标注项，释放逾期占用并发送提醒通知。 */
 const db = require('../store/db');
 const {
   NOTIFICATION_TYPE,

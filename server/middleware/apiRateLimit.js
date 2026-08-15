@@ -1,20 +1,6 @@
 /**
- * API 全局限流中间件
- *
- * 分层限流策略:
- *   全局默认 — 600 请求/分钟/IP（配合 Redis 支持多进程共享）
- *   敏感端点 — 更严格的限制（标注提交、审核操作、用户创建）
- *   健康检查 — 不限流
- *
- * 依赖:
- *   - express-rate-limit: 限流核心
- *   - rate-limit-redis: Redis store（可选，自动降级为内存 store）
- *   - server/utils/redis.js: Redis 连接
- *
- * 环境变量:
- *   API_RATE_LIMIT_WINDOW_MS  — 滑动窗口（默认: 60000）
- *   API_RATE_LIMIT_MAX         — 窗口内最大请求数（默认: 600）
- *   REDIS_URL                  — Redis 可用时启用分布式限流
+ * API 分层限流中间件。
+ * 全局按 IP 限流，敏感操作使用更严格配置；Redis 不可用时退回内存存储。
  */
 
 const rateLimit = require('express-rate-limit');
@@ -24,30 +10,30 @@ let RedisStore;
 try {
   RedisStore = require('rate-limit-redis').default;
 } catch {
-  // rate-limit-redis not installed, fallback to memory
+  // 未安装 Redis 存储插件时使用内存限流。
 }
 
-// ─── Store factory ──────────────────────────────────────────
+// 限流存储工厂。
 
 function createStore() {
   if (RedisStore) {
     const redis = getRedis();
     if (redis) {
       try {
-        // rate-limit-redis v4+ uses sendCommand
+        // rate-limit-redis 新版通过 sendCommand 访问 Redis。
         return new RedisStore({
           sendCommand: (...args) => redis.call(...args),
         });
       } catch (err) {
-        // Fall through to memory
+        // Redis 不可用时回退到内存存储。
       }
     }
   }
-  // Default memory store (single process only)
+  // 默认内存存储，仅适用于单进程。
   return undefined;
 }
 
-// ─── 全局限流 ───────────────────────────────────────────────
+// 全局限流。
 
 const globalLimiter = rateLimit({
   windowMs: Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60_000),
@@ -63,7 +49,7 @@ const globalLimiter = rateLimit({
   },
 });
 
-// ─── 敏感端点限流 ───────────────────────────────────────────
+// 敏感端点限流。
 
 const strictLimiter = (max = 30) =>
   rateLimit({
@@ -79,16 +65,16 @@ const strictLimiter = (max = 30) =>
     },
   });
 
-// 标注提交/驳回后重提: 30/min
+// 标注提交和驳回后重提：每分钟 30 次。
 const annotationSubmitLimiter = strictLimiter(Number(process.env.API_RATE_LIMIT_ANNOTATION || 30));
 
-// 审核操作: 30/min
+// 审核操作：每分钟 30 次。
 const reviewActionLimiter = strictLimiter(Number(process.env.API_RATE_LIMIT_REVIEW || 30));
 
-// 用户创建: 10/min
+// 用户创建：每分钟 10 次。
 const userCreateLimiter = strictLimiter(Number(process.env.API_RATE_LIMIT_USER_CREATE || 10));
 
-// 批量导入: 5/min
+// 批量导入：每分钟 5 次。
 const batchImportLimiter = strictLimiter(Number(process.env.API_RATE_LIMIT_BATCH_IMPORT || 5));
 
 module.exports = {

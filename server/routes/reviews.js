@@ -1,3 +1,4 @@
+/** 审核结果查询和负责人维护接口。 */
 const express = require('express');
 const createCrudRouter = require('./crudFactory');
 const db = require('../store/db');
@@ -29,7 +30,7 @@ function latestReviewsByItem(reviews) {
   return Array.from(latest.values());
 }
 
-// Custom routes must be registered before CRUD, otherwise GET /:id intercepts them.
+// 特殊查询路由必须先于 CRUD 注册，否则会被 /:id 截获。
 
 router.get('/by-item/:dataItemId', (req, res) => {
   const review = sortReviewsNewestFirst(

@@ -1,3 +1,4 @@
+/** 为请求生成或透传链路 ID，并写入响应头。 */
 const crypto = require('crypto');
 
 function requestId(req, res, next) {

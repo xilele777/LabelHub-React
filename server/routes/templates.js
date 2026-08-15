@@ -1,3 +1,4 @@
+/** 标注模板接口及字段结构校验。 */
 const express = require('express');
 const createCrudRouter = require('./crudFactory');
 const { requireAuth } = require('../middleware/auth');

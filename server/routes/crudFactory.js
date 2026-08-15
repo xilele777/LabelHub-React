@@ -1,14 +1,15 @@
+/** 为标准资源提供带筛选、分页、缓存失效和权限钩子的 CRUD 路由工厂。 */
 const crypto = require('crypto');
 const db = require('../store/db');
 const { cacheGet, cacheSet, cacheDel, cacheDelPattern } = require('../utils/cache');
 const { logger } = require('../utils/logger');
 
-// ─── Cache TTL per collection (seconds) ──────────────────
+// 各资源的缓存时间（秒）。
 const CACHE_TTL = {
   templates: 300,
   users: 600,
   tasks: 120,
-  // annotation-items and reviews are write-heavy, skip caching
+  // 标注项和审核结果写入频繁，不做缓存。
   'annotation-items': 0,
   reviews: 0,
 };
@@ -91,10 +92,7 @@ function createCrudRouter(collection, opts = {}) {
     let items;
     let total;
     if (opts.filterList) {
-      // filterList handles all filtering logic (RBAC, archived, task status, etc.)
-      // We load all items and let filterList do its job.
-      // For large datasets, filterList should be optimized to use SQL-level
-      // pre-filtering for query params that map cleanly to DB columns.
+      // 自定义筛选通常包含权限、归档和任务状态等业务条件，因此在内存中统一处理。
       items = db.getAll(collection);
       items = opts.filterList(items, req);
 
@@ -181,7 +179,7 @@ function createCrudRouter(collection, opts = {}) {
       return res.fail(`Create failed: ${err.message || 'database error'}`);
     }
 
-    // Invalidate cache
+    // 写操作后同时清理单项和列表缓存。
     invalidateItemCache(collection, item.id).catch(() => {});
 
     const result = opts.afterRead ? opts.afterRead(created, req) : created;
@@ -210,7 +208,7 @@ function createCrudRouter(collection, opts = {}) {
     const updated = db.updateById(collection, req.params.id, updates);
     const result = opts.afterRead ? opts.afterRead(updated, req) : updated;
 
-    // Invalidate cache
+    // 写操作后同时清理单项和列表缓存。
     invalidateItemCache(collection, req.params.id).catch(() => {});
 
     res.success(result, 'Updated');
@@ -231,7 +229,7 @@ function createCrudRouter(collection, opts = {}) {
 
     db.deleteById(collection, req.params.id);
 
-    // Invalidate cache
+    // 写操作后同时清理单项和列表缓存。
     invalidateItemCache(collection, req.params.id).catch(() => {});
 
     res.success(null, 'Deleted');

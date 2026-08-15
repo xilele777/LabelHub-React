@@ -1,7 +1,8 @@
+/** 为请求生成或透传链路 ID，并写入响应头。 */
 import crypto from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
 
-// Extend Express Request to include requestId
+// 扩展 Express Request 类型。
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {

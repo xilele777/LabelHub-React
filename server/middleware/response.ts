@@ -1,6 +1,7 @@
+/** 为响应对象提供统一的成功、失败和鉴权错误返回方法。 */
 import type { Request, Response, NextFunction } from 'express';
 
-// Extend Express Response to include custom helpers
+// 扩展 Express Response 类型。
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {

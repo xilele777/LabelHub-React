@@ -1,4 +1,4 @@
-/** @type {import('vitest').UserConfig} */
+/** 后端单元测试、覆盖率范围和运行环境配置。 @type {import('vitest').UserConfig} */
 module.exports = {
   test: {
     globals: true,

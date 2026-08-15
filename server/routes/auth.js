@@ -1,3 +1,4 @@
+/** 登录、当前用户信息和认证相关操作。 */
 const express = require('express');
 const db = require('../store/db');
 const { encodeToken } = require('../middleware/auth');
@@ -65,7 +66,7 @@ router.post('/login', loginRateLimit, body(loginSchema), async (req, res) => {
   const token = encodeToken(user.id);
   const { password: _pw, ...userInfo } = user;
 
-  // Set httpOnly cookie for XSS-safe token storage
+  // 使用 httpOnly Cookie 保存令牌，避免脚本直接读取。
   const isProduction = process.env.NODE_ENV === 'production';
   res.cookie('token', token, {
     httpOnly: true,

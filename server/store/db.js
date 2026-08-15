@@ -1,12 +1,6 @@
 /**
- * 数据库适配层工厂
- *
- * 根据 DB_TYPE 环境变量选择后端：
- *   - "sqlite"（默认）→ db_sqlite.js（同步 API，零改动兼容）
- *   - "postgres"    → db_pg.js（异步优先 API，生产推荐）
- *
- * 所有已有代码 require('../store/db') 无需修改。
- * PostgreSQL 模式下，同步方法使用内存缓存层桥接。
+ * 数据库适配层入口。
+ * 根据 DB_TYPE 选择 SQLite 或 PostgreSQL，并向业务代码导出统一接口。
  */
 
 const DB_TYPE = process.env.DB_TYPE || 'sqlite';
@@ -20,7 +14,7 @@ try {
     backend = require('./db_sqlite');
   }
 } catch (err) {
-  // Fallback to SQLite if PG module fails to load
+  // PostgreSQL 初始化失败时回退到 SQLite，保证本地环境仍可启动。
   if (DB_TYPE === 'postgres') {
     console.error(`[DB] PostgreSQL 后端加载失败: ${err.message}`);
     console.error('[DB] 回退到 SQLite');
@@ -28,5 +22,5 @@ try {
   backend = require('./db_sqlite');
 }
 
-// Re-export everything from the chosen backend
+// 业务代码不需要感知具体数据库实现。
 module.exports = backend;

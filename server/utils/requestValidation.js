@@ -1,3 +1,5 @@
+/** 请求体读取工具的 JavaScript 运行版本。 */
+
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

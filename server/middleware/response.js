@@ -1,10 +1,5 @@
 /**
- * Unified API response wrapper.
- *
- * All endpoints should use res.success() / res.fail() so the
- * frontend always receives a consistent structure:
- *
- *   { code: number, message: string, data: any }
+ * 统一响应中间件：为接口提供固定的 { code, message, data } 结构。
  */
 
 function success(data = null, message = 'ok', code = 200) {
@@ -15,23 +10,17 @@ function fail(message = 'error', code = 400, data = null) {
   return this.status(code).json({ code, message, data });
 }
 
-/**
- * Not-found helper (404).
- */
+/** 404 响应辅助方法。 */
 function notFound(message = 'Resource not found') {
   return this.status(404).json({ code: 404, message, data: null });
 }
 
-/**
- * Unauthorized helper (401).
- */
+/** 401 响应辅助方法。 */
 function unauthorized(message = 'Unauthorized') {
   return this.status(401).json({ code: 401, message, data: null });
 }
 
-/**
- * Install helpers on res object.
- */
+/** 将响应辅助方法挂载到 res。 */
 function responseMiddleware(req, res, next) {
   res.success = success;
   res.fail = fail;

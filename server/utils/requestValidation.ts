@@ -1,10 +1,12 @@
-// ─── Type guards ───────────────────────────────────────────
+/** 请求体读取工具：统一处理类型、长度和枚举校验。 */
+
+// 类型判断。
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-// ─── String reader ────────────────────────────────────────
+// 字符串读取。
 
 interface StringOptions {
   required?: boolean;
@@ -52,7 +54,7 @@ function readString(body: unknown, field: string, options: StringOptions = {}): 
   return { value: normalized };
 }
 
-// ─── Field validator ──────────────────────────────────────
+// 字段校验。
 
 interface FieldDef {
   name: string;
@@ -87,7 +89,7 @@ function validateFields(body: unknown, fields: FieldDef[]): ValidateResult {
   return { values };
 }
 
-// ─── Number reader ────────────────────────────────────────
+// 数字读取。
 
 interface NumberOptions {
   required?: boolean;
@@ -125,7 +127,7 @@ function readNumber(body: unknown, field: string, options: NumberOptions = {}): 
   return { value: normalized };
 }
 
-// ─── Enum reader ──────────────────────────────────────────
+// 枚举读取。
 
 function readEnum(
   body: unknown,
@@ -143,7 +145,7 @@ function readEnum(
   return result;
 }
 
-// ─── Array reader ─────────────────────────────────────────
+// 数组读取。
 
 interface ArrayOptions {
   required?: boolean;
@@ -175,6 +177,6 @@ function readArray(body: unknown, field: string, options: ArrayOptions = {}): Re
   return { value };
 }
 
-// ─── Exports ──────────────────────────────────────────────
+// 导出工具。
 
 export { isPlainObject, readString, readNumber, readEnum, readArray, validateFields };

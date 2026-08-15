@@ -1,3 +1,4 @@
+/** 通知查询、已读、发布和撤回接口。 */
 const express = require('express');
 const db = require('../store/db');
 const { requireAuth } = require('../middleware/auth');

@@ -1,3 +1,4 @@
+/** 密码哈希、校验及旧明文密码的兼容升级逻辑。 */
 import crypto from 'node:crypto';
 
 const HASH_ALGORITHM = 'scrypt';

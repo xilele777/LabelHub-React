@@ -1,17 +1,6 @@
 /**
- * Redis 连接单例（懒初始化）
- *
- * 用法:
- *   const { getRedis, isRedisAvailable } = require('../utils/redis');
- *
- *   const redis = getRedis();
- *   if (redis) {
- *     await redis.set('key', 'value');
- *   }
- *
- * 通过环境变量控制:
- *   REDIS_URL=redis://localhost:6379   → 连接 Redis
- *   REDIS_URL 未设置                    → getRedis() 返回 null（优雅降级）
+ * Redis 懒加载单例，为缓存、限流和 WebSocket 多进程适配器提供连接。
+ * 通过 REDIS_URL 控制是否启用，未配置时由调用方降级。
  */
 
 let redis = undefined; // undefined = 未初始化, null = 不可用, object = 已连接
