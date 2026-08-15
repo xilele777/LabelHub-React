@@ -1,7 +1,9 @@
+/** 任务、标注项和审核项的时效判断运行版本。 */
+
 const ANNOTATION_START_ACTIONS = ['assign_annotator', 'claim_assignment', 'reject'];
 const REVIEW_START_ACTIONS = ['assign_reviewer', 'claim_review'];
 const ANNOTATION_OPEN_STATUSES = ['pending', 'draft', 'rejected'];
-const REVIEW_OPEN_STATUSES = ['submitted', 'ai_reviewed', 'pending_review'];
+const REVIEW_OPEN_STATUSES = ['submitted', 'pending_review'];
 
 function parseTime(value) {
   if (!value) return null;

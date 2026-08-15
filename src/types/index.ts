@@ -253,8 +253,6 @@ export enum DataItemStatus {
   PENDING = 'pending', // 待标注
   DRAFT = 'draft', // 已存草稿
   SUBMITTED = 'submitted', // 已提交
-  AI_REVIEWING = 'ai_reviewing', // 规则预审中
-  AI_REVIEWED = 'ai_reviewed', // 规则已预审
   PENDING_REVIEW = 'pending_review', // 待人工审核
   REVIEWED = 'reviewed', // 人工已审核（通过）
   REJECTED = 'rejected', // 人工已驳回
@@ -303,20 +301,8 @@ export const STATUS_TRANSITIONS: Record<DataItemStatus, DataItemStatus[]> = {
     DataItemStatus.PENDING,
     DataItemStatus.PENDING_REVIEW,
   ],
-  // 服务端原子规则预审：submitted 可直接到 pending_review（跳过中间态）；
-  // 仍保留 → ai_reviewing 供手动重跑规则预审使用
+  // 服务端同步完成规则预审：submitted 可直接到 pending_review。
   [DataItemStatus.SUBMITTED]: [
-    DataItemStatus.PENDING_REVIEW,
-    DataItemStatus.AI_REVIEWING,
-    DataItemStatus.REVIEWED,
-    DataItemStatus.REJECTED,
-  ],
-  [DataItemStatus.AI_REVIEWING]: [
-    DataItemStatus.AI_REVIEWED,
-    DataItemStatus.REVIEWED,
-    DataItemStatus.REJECTED,
-  ],
-  [DataItemStatus.AI_REVIEWED]: [
     DataItemStatus.PENDING_REVIEW,
     DataItemStatus.REVIEWED,
     DataItemStatus.REJECTED,
@@ -335,12 +321,6 @@ export const STATUS_DISPLAY_CONFIG: Record<
   [DataItemStatus.PENDING]: { label: '待标注', color: 'default', icon: 'FileTextOutlined' },
   [DataItemStatus.DRAFT]: { label: '草稿', color: 'warning', icon: 'EditOutlined' },
   [DataItemStatus.SUBMITTED]: { label: '已提交', color: 'processing', icon: 'SendOutlined' },
-  [DataItemStatus.AI_REVIEWING]: {
-    label: '规则预审中',
-    color: 'processing',
-    icon: 'LoadingOutlined',
-  },
-  [DataItemStatus.AI_REVIEWED]: { label: '规则已预审', color: 'cyan', icon: 'RobotOutlined' },
   [DataItemStatus.PENDING_REVIEW]: { label: '待人工审核', color: 'orange', icon: 'AuditOutlined' },
   [DataItemStatus.REVIEWED]: { label: '审核通过', color: 'success', icon: 'CheckCircleOutlined' },
   [DataItemStatus.REJECTED]: { label: '审核驳回', color: 'error', icon: 'CloseCircleOutlined' },

@@ -1,13 +1,13 @@
 /**
- * Seed script — populate SQLite database with mock data.
- * Run: node seed.js
+ * 初始化示例数据。
+ * 启动时或手动执行 node seed.js 时调用，整个过程在事务中完成。
  */
 const db = require('./store/db');
 const { hashPassword } = require('./utils/password');
 
-// Wrap entire seed in a transaction for atomicity
+// 整个初始化过程使用事务，避免只写入部分数据。
 const runSeed = db._db.transaction(() => {
-  // ===== Users =====
+  // 用户。
   db.seed('users', [
     {
       id: 'u001',
@@ -32,7 +32,7 @@ const runSeed = db._db.transaction(() => {
     },
   ]);
 
-  // ===== Tasks =====
+  // 任务。
   db.seed('tasks', [
     {
       id: 't001',
@@ -188,7 +188,7 @@ const runSeed = db._db.transaction(() => {
     },
   ]);
 
-  // ===== Templates (with fields schema) =====
+  // 模板及字段定义。
   db.seed('templates', [
     {
       id: 'tpl001',
@@ -811,7 +811,7 @@ const runSeed = db._db.transaction(() => {
     },
   ]);
 
-  // ===== Annotation Items (Data Items) =====
+  // 标注项。
   db.seed('annotation-items', [
     {
       id: 'd001',
@@ -1102,7 +1102,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-19T09:15:01Z',
         },
@@ -1110,8 +1110,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h007',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T09:15:05Z',
         },
@@ -1119,7 +1119,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h008',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T09:15:06Z',
@@ -1165,7 +1165,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-19T10:30:01Z',
         },
@@ -1173,8 +1173,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h011',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T10:30:05Z',
         },
@@ -1182,7 +1182,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h012',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T10:30:06Z',
@@ -1228,7 +1228,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-19T11:45:01Z',
         },
@@ -1236,8 +1236,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h015',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T11:45:05Z',
         },
@@ -1245,7 +1245,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h016',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T11:45:06Z',
@@ -1291,7 +1291,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-19T14:20:01Z',
         },
@@ -1299,8 +1299,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h019',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T14:20:05Z',
         },
@@ -1308,7 +1308,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h020',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T14:20:06Z',
@@ -1353,7 +1353,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-19T16:00:01Z',
         },
@@ -1361,8 +1361,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h023',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T16:00:05Z',
         },
@@ -1370,7 +1370,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h024',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T16:00:06Z',
@@ -1415,7 +1415,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-19T17:30:01Z',
         },
@@ -1423,8 +1423,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h027',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T17:30:05Z',
         },
@@ -1432,7 +1432,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h028',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-19T17:30:06Z',
@@ -1477,7 +1477,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-20T08:00:01Z',
         },
@@ -1485,8 +1485,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h031',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-20T08:00:05Z',
         },
@@ -1494,7 +1494,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h032',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-20T08:00:06Z',
@@ -1541,7 +1541,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-17T10:00:01Z',
         },
@@ -1549,8 +1549,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h035',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-17T10:00:05Z',
         },
@@ -1558,7 +1558,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h036',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-17T10:00:06Z',
@@ -1624,7 +1624,7 @@ const runSeed = db._db.transaction(() => {
           operator: '规则系统',
           actionType: 'ai_review_start',
           fromStatus: 'submitted',
-          toStatus: 'ai_reviewing',
+          toStatus: 'submitted',
           reason: null,
           timestamp: '2026-05-17T11:00:01Z',
         },
@@ -1632,8 +1632,8 @@ const runSeed = db._db.transaction(() => {
           id: 'h040',
           operator: '规则系统',
           actionType: 'ai_review_complete',
-          fromStatus: 'ai_reviewing',
-          toStatus: 'ai_reviewed',
+          fromStatus: 'submitted',
+          toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-17T11:00:05Z',
         },
@@ -1641,7 +1641,7 @@ const runSeed = db._db.transaction(() => {
           id: 'h041',
           operator: '系统',
           actionType: 'assign_reviewer',
-          fromStatus: 'ai_reviewed',
+          fromStatus: 'pending_review',
           toStatus: 'pending_review',
           reason: null,
           timestamp: '2026-05-17T11:00:06Z',
@@ -1659,7 +1659,7 @@ const runSeed = db._db.transaction(() => {
     },
   ]);
 
-  // ===== Reviews (AI Review Results) =====
+  // AI 预审结果。
   db.seed('reviews', [
     {
       id: 'ar101',
@@ -1951,7 +1951,7 @@ const runSeed = db._db.transaction(() => {
     },
   ]);
 
-  // ===== Normalize: ensure all annotation-items have lockedBy / lockedAt / version / archived =====
+  // 补齐旧标注项缺失的锁、版本和归档字段。
   const allItems = db.getAll('annotation-items');
   for (const item of allItems) {
     const patches = {};
@@ -1969,7 +1969,7 @@ const runSeed = db._db.transaction(() => {
     }
   }
 
-  // Normalize tasks: ensure archived field exists
+  // 补齐旧任务缺失的归档字段。
   const allTasks = db.getAll('tasks');
   for (const task of allTasks) {
     if (task.archived === undefined) {

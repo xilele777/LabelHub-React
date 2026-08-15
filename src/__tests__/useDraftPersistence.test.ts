@@ -43,6 +43,7 @@ describe('useDraftPersistence', () => {
   interface HookProps {
     draftKey: string | null;
     version: number;
+    baseline?: Form;
   }
 
   function setup() {
@@ -51,11 +52,12 @@ describe('useDraftPersistence', () => {
     const restoredRecords: DraftRecord<Form>[] = [];
 
     const hook = renderHook(
-      ({ draftKey, version }: HookProps) =>
+      ({ draftKey, version, baseline }: HookProps) =>
         useDraftPersistence<Form>({
           key: draftKey,
           version,
           snapshot: { ...state },
+          baselineSnapshot: baseline,
           restore: (data) => Object.assign(state, data),
           onRestored: (record) => restoredRecords.push(record),
           debounceMs: 500,
@@ -84,6 +86,31 @@ describe('useDraftPersistence', () => {
 
     expect(state.label).toBeUndefined();
     expect(loadDraft('item2')).toBeNull();
+  });
+
+  it('同一条目服务端版本前进时清理旧草稿', () => {
+    saveDraftRecord('item-versioned', {
+      version: 1,
+      savedAt: 1,
+      data: { label: '旧草稿' },
+    });
+    const { rerender, restoredRecords } = setup();
+
+    rerender({ draftKey: 'item-versioned', version: 2 });
+
+    expect(restoredRecords).toHaveLength(0);
+    expect(loadDraft('item-versioned')).toBeNull();
+  });
+
+  it('使用服务端快照建立基线，不把条目切换时的旧表单写成草稿', () => {
+    const { rerender, state } = setup();
+
+    rerender({ draftKey: 'item-baseline', version: 1, baseline: { label: '服务端内容' } });
+    state.label = '服务端内容';
+    rerender({ draftKey: 'item-baseline', version: 1, baseline: { label: '服务端内容' } });
+    vi.advanceTimersByTime(500);
+
+    expect(loadDraft('item-baseline')).toBeNull();
   });
 
   it('表单变化防抖写入本地草稿', () => {

@@ -9,15 +9,7 @@ const categories = ['科技', '体育', '娱乐', '财经', '教育', '医疗', 
 const tags = ['热点', '深度', '评论', '转载', '原创', '辟谣'];
 const scorers = ['annotator1', 'annotator2', 'annotator3', 'annotator4'];
 const sources = ['微博', '头条', '知乎', '百度'];
-const statuses = [
-  'submitted',
-  'pending_review',
-  'ai_reviewed',
-  'reviewed',
-  'rejected',
-  'draft',
-  'pending',
-];
+const statuses = ['submitted', 'pending_review', 'reviewed', 'rejected', 'draft', 'pending'];
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];

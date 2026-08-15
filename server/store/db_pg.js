@@ -1,20 +1,12 @@
 /**
- * PostgreSQL 数据库适配器
- *
- * 实现与 db_sqlite.js 完全相同的接口，
- * 使用 pg Pool 连接池替代 better-sqlite3 单连接。
- *
- * 关键差异：
- *   - JSON 列使用 JSONB 类型，无需手动 JSON.parse/JSON.stringify
- *   - 占位符使用 $1, $2, ... 而非 ?
- *   - 连接池管理替代单连接
- *   - 事务使用 client.query('BEGIN/COMMIT/ROLLBACK')
+ * PostgreSQL 数据库适配器。
+ * 使用连接池实现与 SQLite 适配器兼容的数据访问接口。
  */
 
 const { Pool } = require('pg');
 const path = require('path');
 
-// ─── Connection pool ────────────────────────────────────────
+// 连接池。
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL, // 必须通过环境变量设置，无默认值
@@ -26,13 +18,13 @@ pool.on('error', (err) => {
   console.error('[PG] Unexpected pool error:', err.message);
 });
 
-// ─── Table name mapping ─────────────────────────────────────
+// 表名映射。
 
 function getTableName(collectionName) {
   return collectionName.replace(/-/g, '_');
 }
 
-// ─── Schema initializer ─────────────────────────────────────
+// 表结构初始化。
 
 let tablesInitialized = false;
 
@@ -149,7 +141,7 @@ async function ensureTables() {
       );
     `);
 
-    // Indexes (CREATE INDEX IF NOT EXISTS is PG 9.5+)
+    // 为常用筛选字段建立索引，要求 PostgreSQL 9.5 及以上。
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_annotation_items_taskId ON annotation_items(taskId);
       CREATE INDEX IF NOT EXISTS idx_annotation_items_status ON annotation_items(status);
@@ -164,17 +156,24 @@ async function ensureTables() {
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     `);
 
+    await client.query(
+      `UPDATE annotation_items
+       SET status = 'pending_review', version = version + 1
+       WHERE status = ANY($1::varchar[])`,
+      [['ai_reviewing', 'ai_reviewed']],
+    );
+
     console.log('[PG] 数据库表已初始化');
   } finally {
     client.release();
   }
 }
 
-// ─── Column helpers ─────────────────────────────────────────
+// 列值转换工具。
 
 function getColumnNames(client, tableName, cached) {
   if (cached && columnCache[tableName]) return columnCache[tableName];
-  // We cache this lazily
+  // 字段信息按需缓存。
   return null; // Will be fetched on first use
 }
 
@@ -192,7 +191,7 @@ async function getAllowedColumns(name) {
 }
 
 function assertSafeFilterSync(name, filter = {}) {
-  // Simple regex-based allowlist for sync compatibility
+  // 同步兼容层仅接受白名单格式的字段名。
   for (const key of Object.keys(filter)) {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
       throw new Error(`Unsupported filter field: ${key}`);
@@ -211,9 +210,7 @@ function buildWhereClause(filter = {}, offset = 0) {
       clauses.push(`${key} IS NULL`);
     } else {
       clauses.push(`${key} = $${i}`);
-      // For JSONB columns, we store objects directly; but equality
-      // filters on JSONB columns compare JSON strings, which is fine
-      // for simple values like status, annotator, etc.
+      // JSONB 直接存储对象；简单标量筛选仍使用等值比较。
       params.push(value);
     }
   }
@@ -225,7 +222,7 @@ function buildWhereClause(filter = {}, offset = 0) {
   };
 }
 
-// ─── Row transformers (lighter than SQLite — JSONB already parsed) ──
+// 行数据转换；JSONB 已由驱动解析。
 
 function transformUser(row) {
   if (!row) return null;
@@ -365,10 +362,9 @@ function getTransform(name) {
   return TRANSFORMS[name];
 }
 
-// ─── Generic CRUD ───────────────────────────────────────────
+// 通用 CRUD。
 
-// Use a sync-compatible caching layer. On first access, we load the collection
-// and cache it. The cache is invalidated on writes.
+// 同步兼容层首次读取集合后缓存数据，写入时使缓存失效。
 
 const collectionCache = new Map();
 
@@ -387,23 +383,21 @@ async function _loadCollection(name) {
   return transform ? rows.map(transform) : rows;
 }
 
-// ─── Exported sync API (bridged with promise cache) ─────────
+// 对外同步接口，通过缓存桥接异步数据库操作。
 
-// We use a unique approach: expose a sync-looking API by pre-warming.
-// For a real production app, you'd refactor all callers to async.
-// For now, we maintain compatibility.
+// 通过预热缓存提供同步外观，兼容现有调用方；原生异步接口仍单独导出。
 
 let _warmed = false;
 
 async function _warmup() {
   if (_warmed) return;
   await ensureTables();
-  // Preload all collections into cache
+  // 预加载业务集合。
   for (const name of ['users', 'templates', 'tasks', 'annotation-items', 'reviews']) {
     const items = await _loadCollection(name);
     collectionCache.set(_getCollectionCacheKey(name), items);
   }
-  // Preload notification cache
+  // 预加载通知缓存。
   const allNotifs = await _loadNotifs(null);
   notifCache.set('all', allNotifs);
   _warmed = true;
@@ -413,7 +407,7 @@ async function _warmup() {
 function _getCached(name) {
   const key = _getCollectionCacheKey(name);
   if (!collectionCache.has(key)) {
-    // Trigger async load but return empty for now
+    // 首次未命中时启动异步加载，本次先返回空集合。
     _loadCollection(name)
       .then((items) => {
         collectionCache.set(key, items);
@@ -432,7 +426,7 @@ async function _refreshCache(name) {
   return items;
 }
 
-// ─── Public API ─────────────────────────────────────────────
+// 对外 API。
 
 async function getAllAsync(name) {
   await ensureTables();
@@ -440,7 +434,7 @@ async function getAllAsync(name) {
 }
 
 function getAll(name) {
-  // Sync fallback: use cache
+  // 同步查询从缓存读取。
   _warmup().catch(() => {});
   return _getCached(name);
 }
@@ -455,7 +449,7 @@ async function getByIdAsync(name, id) {
 }
 
 function getById(name, id) {
-  // Sync fallback: search cache
+  // 同步单条查询从缓存检索。
   const items = getAll(name);
   return items.find((item) => item.id === id) || null;
 }
@@ -471,7 +465,7 @@ async function findAsync(name, filter = {}) {
 }
 
 function find(name, filter = {}) {
-  // Sync fallback: filter cache
+  // 同步条件查询在缓存中筛选。
   const items = getAll(name);
   return items.filter((item) => {
     for (const [key, value] of Object.entries(filter)) {
@@ -490,14 +484,14 @@ async function listAsync(name, options = {}) {
 
   const { where, params } = buildWhereClause(filter, 0);
 
-  // Count
+  // 统计总数。
   const countResult = await pool.query(
     `SELECT COUNT(*) AS total FROM ${tableName} ${where}`,
     params,
   );
   const total = Number(countResult.rows[0].total);
 
-  // Sort
+  // 排序。
   const sortField = options.sort || null;
   const order = String(options.order || '').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
   let orderClause = '';
@@ -506,7 +500,7 @@ async function listAsync(name, options = {}) {
     orderClause = `ORDER BY ${sortField} ${order}`;
   }
 
-  // Paginate
+  // 分页。
   const limit = Number(options.limit) > 0 ? Math.floor(Number(options.limit)) : 0;
   const page = Number(options.page) > 0 ? Math.floor(Number(options.page)) : 1;
   const offset = (page - 1) * limit;
@@ -526,7 +520,7 @@ async function listAsync(name, options = {}) {
 }
 
 function list(name, options = {}) {
-  // Sync fallback: filter + sort + paginate cache
+  // 同步列表接口在缓存中完成筛选、排序和分页。
   const filter = options.filter || {};
   const allItems = getAll(name);
   let items = allItems.filter((item) => {
@@ -596,7 +590,7 @@ async function updateByIdAsync(name, id, updates) {
     i++;
   }
 
-  // Auto-increment version for annotation-items
+  // 标注项更新时自动增加版本号。
   if (name === 'annotation-items' && !updates._skipVersionIncrement) {
     setClauses.push(`version = version + 1`);
   }
@@ -617,7 +611,7 @@ function updateById(name, id, updates) {
   });
   _invalidateCache(name);
 
-  // Try to compute merged result from cache
+  // 根据缓存计算合并后的返回结果。
   const existing = getById(name, id);
   if (!existing) return null;
   const merged = { ...existing, ...updates, id };
@@ -813,7 +807,7 @@ async function transactionAsync(fn) {
 }
 
 function transaction(fn) {
-  // Sync wrapper: execute in a fire-and-forget transaction
+  // 同步包装层异步提交事务，调用方不等待结果。
   transactionAsync(fn).catch((err) => {
     console.error('[PG] Transaction failed:', err.message);
   });
@@ -829,7 +823,7 @@ function isSeeded() {
   return getAll('users').length > 0;
 }
 
-// ─── Notification cache ────────────────────────────────────
+// 通知缓存。
 
 const notifCache = new Map(); // key: "all" | "user:{username}", value: notification[]
 
@@ -870,7 +864,7 @@ async function _loadNotifs(username) {
   return rows.map(transformNotification);
 }
 
-// ─── Notification sync API ──────────────────────────────────
+// 通知同步接口。
 
 function getNotificationsForUser(username, options = {}) {
   const limit = Math.max(1, Math.min(Number(options.limit) || 100, 200));
@@ -936,7 +930,7 @@ function markNotificationReadForUser(username, notificationId) {
   _markReadAsync(username, notificationId).catch((err) => {
     console.error('[PG] markRead failed:', err.message);
   });
-  // Optimistically update cache
+  // 先更新缓存，再异步写入数据库。
   const key = _getNotifCacheKey(username);
   if (notifCache.has(key)) {
     const items = notifCache.get(key);
@@ -963,7 +957,7 @@ function markAllNotificationsReadForUser(username) {
   _markAllReadAsync(username).catch((err) => {
     console.error('[PG] markAllRead failed:', err.message);
   });
-  // Optimistic cache update
+  // 乐观更新缓存。
   const key = _getNotifCacheKey(username);
   if (notifCache.has(key)) {
     notifCache.set(
@@ -1097,7 +1091,7 @@ function clearNotificationsForUserByTypes(username, types) {
 }
 
 function clearNotificationsForUserExceptType(username, type) {
-  // Complex: delete all except specific type
+  // 清理通知时保留指定类型。
   _clearNotifsExceptAsync(username, type).catch(() => {});
   const key = _getNotifCacheKey(username);
   if (notifCache.has(key)) {
@@ -1195,7 +1189,7 @@ function updatePublishedNotificationData(sender = null, publishId, updater) {
   return 0;
 }
 
-// Also update insertNotification to work with cache
+// 通知写入同时维护缓存。
 async function insertNotificationAsync(notification) {
   await ensureTables();
   const item = {
@@ -1229,7 +1223,7 @@ async function insertNotificationAsync(notification) {
     ],
   );
 
-  // Update cache
+  // 更新缓存。
   if (item.recipientUsername) {
     const key = _getNotifCacheKey(item.recipientUsername);
     if (notifCache.has(key)) {
@@ -1257,7 +1251,7 @@ function insertNotification(notification) {
     console.error('[PG] Insert notification failed:', err.message);
   });
 
-  // Optimistically update cache
+  // 乐观更新缓存。
   if (item.recipientUsername) {
     const key = _getNotifCacheKey(item.recipientUsername);
     if (notifCache.has(key)) {
@@ -1272,23 +1266,23 @@ function insertNotification(notification) {
   return item;
 }
 
-// ─── Close ──────────────────────────────────────────────────
+// 关闭连接池。
 
 async function close() {
   await pool.end();
   console.log('[PG] 连接池已关闭');
 }
 
-// ─── Warmup ─────────────────────────────────────────────────
+// 预热连接。
 
 _warmup().catch((err) => {
   console.error('[PG] Warmup failed:', err.message);
 });
 
-// ─── Exports ────────────────────────────────────────────────
+// 导出接口。
 
 module.exports = {
-  // Core CRUD
+  // 核心 CRUD。
   getAll,
   getById,
   find,
@@ -1308,7 +1302,7 @@ module.exports = {
   transaction,
   isSeeded,
 
-  // Async versions (for migration path)
+  // 原生异步接口，供后续迁移使用。
   getAllAsync,
   getByIdAsync,
   findAsync,
@@ -1322,7 +1316,7 @@ module.exports = {
   isSeededAsync,
   insertNotificationAsync,
 
-  // Notifications
+  // 通知接口。
   insertNotification,
   getNotificationsForUser,
   getNotificationsForUserByType,
@@ -1347,7 +1341,7 @@ module.exports = {
   getPublishedNotificationRowsByPublishId,
   updatePublishedNotificationData,
 
-  // Meta
+  // 元信息和连接管理。
   isPostgres: true,
   close,
   _db: pool,

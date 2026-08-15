@@ -1,51 +1,31 @@
 /**
- * Backend State Machine Definitions & Validation
- *
- * Single source of truth for status transition rules.
- * Mirrors the frontend STATUS_TRANSITIONS (DataItemStatus) and
- * adds TaskStatus transitions that were previously only enforced on the client.
- *
- * ⚠️  Any change here should be reflected in the frontend as well.
+ * 标注项和任务的状态机定义及迁移校验。
+ * 前后端状态规则需要保持一致，修改后应同步检查前端实现。
  */
 
-// ─── DataItemStatus (annotation-items) ────────────────────
+// 标注项状态。
 const DATA_ITEM_STATUS = {
   PENDING: 'pending',
   DRAFT: 'draft',
   SUBMITTED: 'submitted',
-  AI_REVIEWING: 'ai_reviewing',
-  AI_REVIEWED: 'ai_reviewed',
   PENDING_REVIEW: 'pending_review',
   REVIEWED: 'reviewed',
   REJECTED: 'rejected',
 };
 
 /**
- * Legal status transitions for annotation data items.
- * Key = current status, Value = array of allowed next statuses.
+ * 标注项允许的状态迁移，键为当前状态，值为可进入的目标状态。
  */
 const DATA_ITEM_TRANSITIONS = {
-  // 允许从 pending 直接提交（无需先保存草稿）；服务端提交后会原子完成 AI 预审并进入待人工审核
+  // 允许从 pending 直接提交（无需先保存草稿）；服务端提交后会同步完成规则预审并进入待人工审核
   [DATA_ITEM_STATUS.PENDING]: [
     DATA_ITEM_STATUS.DRAFT,
     DATA_ITEM_STATUS.SUBMITTED,
     DATA_ITEM_STATUS.PENDING_REVIEW,
   ],
   [DATA_ITEM_STATUS.DRAFT]: [DATA_ITEM_STATUS.SUBMITTED, DATA_ITEM_STATUS.PENDING],
-  // 服务端原子 AI 预审：submitted 可直接到 pending_review（跳过中间态）；
-  // 仍保留 → ai_reviewing 供手动重跑 AI 预审使用
+  // 服务端同步完成规则预审：submitted 可直接到 pending_review。
   [DATA_ITEM_STATUS.SUBMITTED]: [
-    DATA_ITEM_STATUS.PENDING_REVIEW,
-    DATA_ITEM_STATUS.AI_REVIEWING,
-    DATA_ITEM_STATUS.REVIEWED,
-    DATA_ITEM_STATUS.REJECTED,
-  ],
-  [DATA_ITEM_STATUS.AI_REVIEWING]: [
-    DATA_ITEM_STATUS.AI_REVIEWED,
-    DATA_ITEM_STATUS.REVIEWED,
-    DATA_ITEM_STATUS.REJECTED,
-  ],
-  [DATA_ITEM_STATUS.AI_REVIEWED]: [
     DATA_ITEM_STATUS.PENDING_REVIEW,
     DATA_ITEM_STATUS.REVIEWED,
     DATA_ITEM_STATUS.REJECTED,
@@ -55,7 +35,7 @@ const DATA_ITEM_TRANSITIONS = {
   [DATA_ITEM_STATUS.REJECTED]: [DATA_ITEM_STATUS.SUBMITTED],
 };
 
-// ─── TaskStatus ────────────────────────────────────────────
+// 任务状态。
 const TASK_STATUS = {
   DRAFT: 'draft',
   PENDING: 'pending',
@@ -65,8 +45,7 @@ const TASK_STATUS = {
 };
 
 /**
- * Legal status transitions for tasks.
- * Key = current status, Value = array of allowed next statuses.
+ * 任务允许的状态迁移，键为当前状态，值为可进入的目标状态。
  */
 const TASK_TRANSITIONS = {
   [TASK_STATUS.DRAFT]: [TASK_STATUS.PENDING, TASK_STATUS.IN_PROGRESS],
@@ -76,18 +55,13 @@ const TASK_TRANSITIONS = {
   [TASK_STATUS.ENDED]: [],
 };
 
-// ─── Validation helper ─────────────────────────────────────
+// 状态迁移校验。
 
 /**
- * Validate a status transition against a transition map.
- *
- * @param {Object} transitions - The transition map to check against
- * @param {string} currentStatus - The item's current status
- * @param {string} targetStatus  - The desired next status
- * @returns {{ valid: boolean, reason: string }}
+ * 根据状态迁移表校验目标状态，并返回失败原因。
  */
 function validateTransition(transitions, currentStatus, targetStatus) {
-  // Unknown current status
+  // 当前状态不存在于状态机中。
   if (!Object.prototype.hasOwnProperty.call(transitions, currentStatus)) {
     return {
       valid: false,
@@ -97,7 +71,7 @@ function validateTransition(transitions, currentStatus, targetStatus) {
 
   const allowed = transitions[currentStatus];
 
-  // Target not in allowed list
+  // 目标状态不在允许的迁移列表中。
   if (!allowed.includes(targetStatus)) {
     return {
       valid: false,

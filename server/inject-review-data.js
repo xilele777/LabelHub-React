@@ -84,7 +84,7 @@ const tx = db._db.transaction(() => {
 
     db.insert('annotation-items', item);
 
-    // 同时生成一条 AI 预审结果，让审核页右侧能看到 AI 卡片
+    // 同时生成一条规则预审结果，让审核页右侧能看到预审卡片
     const score =
       aiStatus === 'pass' ? 85 + (i % 15) : aiStatus === 'risk' ? 50 + (i % 30) : 20 + (i % 30);
     db.insert('reviews', {

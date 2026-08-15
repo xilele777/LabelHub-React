@@ -47,6 +47,8 @@ export interface UseDraftPersistenceOptions<T> {
   version: number | string;
   /** 当前表单快照。 */
   snapshot: T;
+  /** 当前条目的服务端快照，用于切换条目时建立保存基线。 */
+  baselineSnapshot?: T;
   /** 将草稿写回表单 */
   restore: (data: T) => void;
   onRestored?: (record: DraftRecord<T>) => void;
@@ -67,9 +69,10 @@ export interface UseDraftPersistenceOptions<T> {
  * 调用方应在切换条目时先完成表单重置，再交给本 Hook 恢复草稿。
  */
 export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
-  const { key, snapshot, debounceMs = 500 } = options;
+  const { key, version, snapshot, debounceMs = 500 } = options;
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastSnapshotRef = useRef<string | null>(null);
+  const baselineSnapshotRef = useRef<string | null>(null);
   // 首次快照只建立基线，不立即写入；清除草稿后下一次变化仍会正常保存。
   const hasBaselineRef = useRef(false);
 
@@ -79,12 +82,21 @@ export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
     latestRef.current = options;
   });
 
-  // 条目变化时尝试恢复版本匹配的草稿。
+  // 条目或服务端版本变化时，取消旧定时器并重新校验草稿。
   useEffect(() => {
-    if (!key) return;
-    // 切换条目后重新建立快照基线，避免把表单重置误判为用户修改。
-    hasBaselineRef.current = false;
-    lastSnapshotRef.current = null;
+    clearTimeout(timerRef.current);
+    if (!key) {
+      hasBaselineRef.current = false;
+      lastSnapshotRef.current = null;
+      baselineSnapshotRef.current = null;
+      return;
+    }
+
+    const baseline = latestRef.current.baselineSnapshot ?? latestRef.current.snapshot;
+    const serializedBaseline = JSON.stringify(baseline);
+    hasBaselineRef.current = true;
+    lastSnapshotRef.current = serializedBaseline;
+    baselineSnapshotRef.current = serializedBaseline;
 
     const record = loadDraft<T>(key);
     if (!record) return;
@@ -92,15 +104,21 @@ export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
       clearDraftRecord(key);
       return;
     }
-    if (JSON.stringify(record.data) === JSON.stringify(latestRef.current.snapshot)) return;
+    if (JSON.stringify(record.data) === JSON.stringify(baseline)) return;
     latestRef.current.restore(record.data);
     latestRef.current.onRestored?.(record);
-  }, [key]);
+  }, [key, version]);
 
   // 表单快照变化后防抖写入本地草稿。
   const shallow = key ? JSON.stringify(snapshot) : null;
   useEffect(() => {
+    clearTimeout(timerRef.current);
     if (!key || shallow === null) return;
+    if (shallow === baselineSnapshotRef.current) {
+      lastSnapshotRef.current = shallow;
+      clearDraftRecord(key);
+      return;
+    }
     if (shallow === lastSnapshotRef.current) return;
     lastSnapshotRef.current = shallow;
     if (!hasBaselineRef.current) {
@@ -108,7 +126,6 @@ export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
       return;
     }
 
-    clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       saveDraftRecord(key, {
         version: latestRef.current.version,
@@ -126,7 +143,8 @@ export function useDraftPersistence<T>(options: UseDraftPersistenceOptions<T>) {
   /** 服务端保存/提交成功后调用，清理当前条目的本地草稿 */
   const clear = useCallback(() => {
     clearTimeout(timerRef.current);
-    lastSnapshotRef.current = null;
+    lastSnapshotRef.current = JSON.stringify(latestRef.current.snapshot);
+    hasBaselineRef.current = true;
     const currentKey = latestRef.current.key;
     if (currentKey) clearDraftRecord(currentKey);
   }, []);

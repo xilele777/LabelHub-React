@@ -1,11 +1,5 @@
 /**
- * 任务分配 API 路由
- *
- * POST   /api/tasks/:taskId/assign          - 执行分配
- * POST   /api/tasks/:taskId/assign/clear    - 清除分配
- * GET    /api/tasks/:taskId/assign/stats    - 获取分配统计
- * GET    /api/tasks/:taskId/assign/items    - 获取待分配数据列表
- * GET    /api/assignments/annotators        - 获取所有标注员列表
+ * 任务分配接口：执行、清除和查询任务分配结果。
  */
 const express = require('express');
 const db = require('../store/db');
@@ -94,9 +88,7 @@ router.get('/tasks/:taskId/review-assign/items', requireRole('owner'), (req, res
     return res.notFound('任务不存在');
   }
 
-  const statuses = status
-    ? String(status).split(',')
-    : ['submitted', 'ai_reviewed', 'pending_review'];
+  const statuses = status ? String(status).split(',') : ['submitted', 'pending_review'];
   const allItems = db.find('annotation-items', { taskId });
   const items = allItems.filter((item) => {
     if (item.archived) return false;
@@ -151,7 +143,7 @@ router.post('/tasks/:taskId/review-assign', requireRole('owner'), (req, res) => 
       details.push({ itemId, reviewer, success: false, reason: '审核员不存在' });
       continue;
     }
-    if (!['submitted', 'ai_reviewed', 'pending_review'].includes(item.status)) {
+    if (!['submitted', 'pending_review'].includes(item.status)) {
       details.push({ itemId, reviewer, success: false, reason: '当前状态不允许分配审核' });
       continue;
     }
@@ -180,7 +172,7 @@ router.post('/tasks/:taskId/review-assign', requireRole('owner'), (req, res) => 
  * POST /api/tasks/:taskId/assign
  * 执行任务分配
  *
- * Body:
+ * 请求体：
  *   {
  *     strategy: 'even_split' | 'manual',
  *     annotators: ['user1', 'user2', ...],  // 标注员用户名列表
@@ -234,7 +226,7 @@ router.post('/tasks/:taskId/assign', requireRole('owner'), (req, res) => {
     return res.fail(result.error);
   }
 
-  // 🔔 实时通知：任务分配 → 推送给被分配的标注员和审核员
+  // 将任务分配结果实时通知相关标注员和审核员。
   if (annotators && annotators.length > 0) {
     notifyTaskAssigned(taskId, annotators, result);
   }
@@ -246,7 +238,7 @@ router.post('/tasks/:taskId/assign', requireRole('owner'), (req, res) => {
  * POST /api/tasks/:taskId/assign/clear
  * 清除任务分配
  *
- * Body:
+ * 请求体：
  *   {
  *     itemIds: ['id1', 'id2']  // 可选，为空则清除全部未开始标注的
  *   }

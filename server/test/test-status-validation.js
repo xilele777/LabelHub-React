@@ -250,6 +250,7 @@ async function run() {
       `/api/annotation-items/${pendingItem.id}/save-draft`,
       {
         annotationData: { test: 1 },
+        version: pendingItem.version,
       },
       annotatorToken,
     );
@@ -260,7 +261,7 @@ async function run() {
     );
 
     // Legal: pending → submitted (can submit directly without saving draft first)
-    // 后端原子 AI 预审：允许从 pending 直接提交，无需先保存草稿
+    // 后端同步规则预审：允许从 pending 直接提交，无需先保存草稿
     const anotherPending = items.filter((i) => i.status === 'pending')[1];
     if (anotherPending) {
       const res4b = await request(
@@ -268,11 +269,12 @@ async function run() {
         `/api/annotation-items/${anotherPending.id}/submit`,
         {
           annotationData: { test: 1 },
+          version: anotherPending.version,
         },
         annotatorToken,
       );
       assert(
-        'pending → submitted via submit (legal, auto AI review)',
+        'pending → pending_review via submit (legal, auto rule review)',
         res4b.body.code === 200,
         `got ${res4b.body.code}: ${res4b.body.message}`,
       );
@@ -280,17 +282,18 @@ async function run() {
   }
 
   if (draftItem) {
-    // Legal: draft → submitted — requires annotator role
+    // Legal: draft → pending_review after synchronous rule review.
     const res4c = await request(
       'PUT',
       `/api/annotation-items/${draftItem.id}/submit`,
       {
         annotationData: { test: 1 },
+        version: draftItem.version,
       },
       annotatorToken,
     );
     assert(
-      'draft → submitted via submit (legal)',
+      'draft → pending_review via submit (legal)',
       res4c.body.code === 200,
       `got ${res4c.body.code}: ${res4c.body.message}`,
     );
@@ -319,17 +322,18 @@ async function run() {
   }
 
   if (rejectedItem) {
-    // Legal: rejected → submitted (resubmit after rejection) — requires annotator role
+    // Legal: rejected → pending_review after resubmission and synchronous rule review.
     const res7 = await request(
       'PUT',
       `/api/annotation-items/${rejectedItem.id}/resubmit`,
       {
         annotationData: { test: 2 },
+        version: rejectedItem.version,
       },
       annotatorToken,
     );
     assert(
-      'rejected → submitted via resubmit (legal)',
+      'rejected → pending_review via resubmit (legal)',
       res7.body.code === 200,
       `got ${res7.body.code}: ${res7.body.message}`,
     );
@@ -342,6 +346,7 @@ async function run() {
       `/api/annotation-items/${pendingReviewItem.id}/approve`,
       {
         reason: 'test approve',
+        version: pendingReviewItem.version,
       },
       reviewerToken,
     );

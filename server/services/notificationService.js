@@ -1,15 +1,7 @@
 /**
- * WebSocket 实时通知服务
- *
- * 基于 Socket.IO，为平台提供实时推送能力：
- *   1. 驳回/通过通知 — 审核员操作后实时推送给标注员
- *   2. 任务分配通知 — Owner 分配任务后实时推送给标注员
- *   3. 任务进度更新 — 标注提交/审核完成后推送给相关用户
- *
- * 房间策略：
- *   - 每个用户加入以用户ID为名的房间：room:user:<userId>
- *   - 每个任务加入以任务ID为名的房间：room:task:<taskId>
- *   - 角色房间：room:role:annotator / room:role:reviewer / room:role:owner
+ * Socket.IO 实时通知服务。
+ * 负责业务通知的生成、权限范围和 WebSocket 房间管理。
+ * 用户、角色和任务房间分别用于定向通知、角色广播和任务进度刷新。
  */
 const { Server } = require('socket.io');
 const { decodeToken } = require('../middleware/auth');
@@ -17,14 +9,12 @@ const db = require('../store/db');
 
 let io = null;
 
-/**
- * 通知类型枚举
- */
+/** 通知类型枚举。 */
 const NOTIFICATION_TYPE = {
   // 审核相关
   REVIEW_APPROVED: 'review_approved', // 审核通过
   REVIEW_REJECTED: 'review_rejected', // 审核驳回
-  AI_REVIEW_COMPLETE: 'ai_review_complete', // AI 预审完成
+  AI_REVIEW_COMPLETE: 'ai_review_complete', // 规则预审完成（兼容旧事件名）
 
   // 任务分配相关
   TASK_ASSIGNED: 'task_assigned', // 新任务分配
@@ -38,9 +28,7 @@ const NOTIFICATION_TYPE = {
   OWNER_MESSAGE: 'owner_message', // 负责人主动发布
 };
 
-/**
- * 通知优先级
- */
+/** 通知优先级。 */
 const NOTIFICATION_PRIORITY = {
   [NOTIFICATION_TYPE.REVIEW_REJECTED]: 'high',
   [NOTIFICATION_TYPE.REVIEW_APPROVED]: 'medium',
@@ -54,13 +42,11 @@ const NOTIFICATION_PRIORITY = {
   [NOTIFICATION_TYPE.OWNER_MESSAGE]: 'medium',
 };
 
-/**
- * 通知类型 → 默认标题
- */
+/** 各通知类型的默认标题。 */
 const NOTIFICATION_TITLE = {
   [NOTIFICATION_TYPE.REVIEW_APPROVED]: '审核通过',
   [NOTIFICATION_TYPE.REVIEW_REJECTED]: '审核驳回',
-  [NOTIFICATION_TYPE.AI_REVIEW_COMPLETE]: 'AI 预审完成',
+  [NOTIFICATION_TYPE.AI_REVIEW_COMPLETE]: '规则预审完成',
   [NOTIFICATION_TYPE.TASK_ASSIGNED]: '新任务分配',
   [NOTIFICATION_TYPE.TASK_UNASSIGNED]: '任务分配取消',
   [NOTIFICATION_TYPE.TASK_SUBMITTED]: '标注已提交',
@@ -70,9 +56,7 @@ const NOTIFICATION_TITLE = {
   [NOTIFICATION_TYPE.OWNER_MESSAGE]: '负责人通知',
 };
 
-/**
- * 创建通知对象
- */
+/** 补齐通知 ID、时间、优先级等通用字段。 */
 function createNotification({ type, title, message, data = {}, sender = null, targetUsers = [] }) {
   return {
     id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -112,9 +96,11 @@ function canDeliverNotificationToUser(username, notification) {
   const user = db.findOne('users', { username });
   if (notification.type === NOTIFICATION_TYPE.OWNER_MESSAGE) return true;
   if (user?.role === 'annotator') {
-    return [NOTIFICATION_TYPE.REVIEW_REJECTED, NOTIFICATION_TYPE.TASK_DUE_SOON].includes(
-      notification.type,
-    );
+    return [
+      NOTIFICATION_TYPE.REVIEW_APPROVED,
+      NOTIFICATION_TYPE.REVIEW_REJECTED,
+      NOTIFICATION_TYPE.TASK_DUE_SOON,
+    ].includes(notification.type);
   }
   if (user?.role === 'reviewer') {
     return [NOTIFICATION_TYPE.TASK_RESUBMITTED, NOTIFICATION_TYPE.TASK_DUE_SOON].includes(
@@ -127,6 +113,7 @@ function canDeliverNotificationToUser(username, notification) {
 function getVisibleNotificationTypesForUser(user) {
   if (user?.role === 'annotator') {
     return [
+      NOTIFICATION_TYPE.REVIEW_APPROVED,
       NOTIFICATION_TYPE.REVIEW_REJECTED,
       NOTIFICATION_TYPE.TASK_DUE_SOON,
       NOTIFICATION_TYPE.OWNER_MESSAGE,
@@ -173,7 +160,7 @@ function initNotificationService(server, corsOptions) {
     pingTimeout: 20000,
   });
 
-  // ─── Redis 多进程适配器 ──────────────────────────────
+  // Redis 多进程适配器。
   try {
     const { getRedis } = require('../utils/redis');
     const redis = getRedis();
@@ -185,13 +172,13 @@ function initNotificationService(server, corsOptions) {
       console.log('[WS] Redis 多进程适配器已启用');
     }
   } catch (err) {
-    // @socket.io/redis-adapter 未安装时静默跳过
+    // 未安装适配器时保留单进程模式。
     if (err.code !== 'MODULE_NOT_FOUND') {
       console.warn('[WS] Redis 适配器初始化失败:', err.message);
     }
   }
 
-  // ─── 认证中间件 ──────────────────────────────────
+  // WebSocket 认证。
   io.use((socket, next) => {
     // 从握手请求中获取 token
     const token =
@@ -220,7 +207,7 @@ function initNotificationService(server, corsOptions) {
     next();
   });
 
-  // ─── 连接处理 ──────────────────────────────────
+  // 连接和房间管理。
   io.on('connection', (socket) => {
     const user = socket.data.user;
 
@@ -231,17 +218,15 @@ function initNotificationService(server, corsOptions) {
 
     console.log(`[WS] 用户连接: ${user.username} (${user.role}) - ${socket.id}`);
 
-    // 加入用户房间
     socket.join(`user:${user.id}`);
     socket.join(`user:username:${user.username}`);
 
-    // 加入角色房间
     socket.join(`role:${user.role}`);
 
-    // 加入相关任务房间
+    // 任务房间按业务归属加入，不能由客户端任意订阅。
     joinTaskRooms(socket, user);
 
-    // ─── 事件处理 ──────────────────────────────
+    // 客户端事件。
 
     // 客户端请求加入特定任务房间：必须校验当前用户是否有权访问该任务，避免跨用户订阅造成通知串号
     socket.on('join:task', (taskId) => {
@@ -255,12 +240,10 @@ function initNotificationService(server, corsOptions) {
       console.log(`[WS] ${user.username} 加入任务房间: ${taskId}`);
     });
 
-    // 客户端请求离开任务房间
     socket.on('leave:task', (taskId) => {
       socket.leave(`task:${taskId}`);
     });
 
-    // 标记通知已读
     socket.on('notification:read', (notificationId) => {
       db.markNotificationReadForUser(user.username, notificationId);
       socket.emit('notification:read_ack', {
@@ -269,7 +252,6 @@ function initNotificationService(server, corsOptions) {
       });
     });
 
-    // 标记所有通知已读
     socket.on('notification:read_all', () => {
       const visibleTypes = getVisibleNotificationTypesForUser(user);
       if (visibleTypes) {
@@ -280,7 +262,6 @@ function initNotificationService(server, corsOptions) {
       socket.emit('notification:read_all_ack', { readAt: new Date().toISOString() });
     });
 
-    // 获取未读计数
     socket.on('notification:unread_count', () => {
       const visibleTypes = getVisibleNotificationTypesForUser(user);
       const count = visibleTypes
@@ -291,10 +272,8 @@ function initNotificationService(server, corsOptions) {
       });
     });
 
-    // 断开连接
     socket.on('disconnect', (reason) => {
       console.log(`[WS] 用户断开: ${user.username} - 原因: ${reason}`);
-      // 显式离开所有房间（Socket.IO 会自动清理，但显式清理更安全）
       socket.leave(`user:${user.id}`);
       socket.leave(`user:username:${user.username}`);
       socket.leave(`role:${user.role}`);
@@ -305,9 +284,7 @@ function initNotificationService(server, corsOptions) {
   return io;
 }
 
-/**
- * 从请求头中提取 Bearer token
- */
+/** 从请求头提取 Bearer 令牌。 */
 function extractTokenFromHeaders(headers) {
   const authHeader = headers.authorization || '';
   const match = authHeader.match(/^Bearer\s+(.+)$/);
@@ -398,9 +375,7 @@ function notifyUsersByUsername(usernames, notification) {
   return persistedNotifications;
 }
 
-/**
- * 让用户加入相关任务房间
- */
+/** 按用户角色和任务归属加入可访问的任务房间。 */
 function joinTaskRooms(socket, user) {
   try {
     if (user.role === 'owner') {
@@ -433,13 +408,9 @@ function joinTaskRooms(socket, user) {
   }
 }
 
-// ===== 通知发送方法 =====
+// 通知发送方法。
 
-/**
- * 向指定用户发送通知
- * @param {string} userId - 目标用户ID
- * @param {Object} notification - 通知内容
- */
+/** 向指定用户 ID 发送并持久化通知。 */
 function notifyUser(userId, notification) {
   const user = db.getById('users', userId);
   if (!user) return null;
@@ -455,48 +426,29 @@ function notifyUser(userId, notification) {
   return persisted;
 }
 
-/**
- * 向指定用户名发送通知
- * @param {string} username - 目标用户名
- * @param {Object} notification - 通知内容
- */
+/** 按用户名发送通知。 */
 function notifyUserByUsername(username, notification) {
   return notifyUsersByUsername([username], notification);
 }
 
-/**
- * 向角色广播通知
- * @param {string} role - 角色
- * @param {Object} notification - 通知内容
- */
+/** 向指定角色房间广播通知。 */
 function notifyRole(role, notification) {
   return notifyUsersByUsername(getUsernamesByRole(role), notification);
 }
 
-/**
- * 向任务房间广播通知
- * @param {string} taskId - 任务ID
- * @param {Object} notification - 通知内容
- */
+/** 向指定任务房间广播通知。 */
 function notifyTask(taskId, notification) {
   return notifyUsersByUsername(getUsernamesForTask(taskId), notification);
 }
 
-/**
- * 广播全局通知
- * @param {Object} notification - 通知内容
- */
+/** 向全部连接广播通知。 */
 function broadcastNotification(notification) {
   return notifyUsersByUsername(getAllUsernames(), notification);
 }
 
-// ===== 业务通知方法 =====
+// 业务通知方法。
 
-/**
- * 审核通过通知 — 推送给标注员
- * @param {Object} item - 标注项
- * @param {Object} reviewer - 审核员信息
- */
+/** 将审核通过结果推送给对应标注员。 */
 function notifyReviewApproved(item, reviewer) {
   const task = db.getById('tasks', item.taskId);
   const notification = createNotification({
@@ -521,11 +473,7 @@ function notifyReviewApproved(item, reviewer) {
   return notification;
 }
 
-/**
- * 审核驳回通知 — 推送给标注员（高优先级）
- * @param {Object} item - 标注项
- * @param {Object} reviewer - 审核员信息
- */
+/** 将审核驳回结果以高优先级推送给对应标注员。 */
 function notifyReviewRejected(item, reviewer) {
   const task = db.getById('tasks', item.taskId);
   const notification = createNotification({
@@ -551,12 +499,7 @@ function notifyReviewRejected(item, reviewer) {
   return notification;
 }
 
-/**
- * 任务分配通知 — 推送给被分配的标注员
- * @param {string} taskId - 任务ID
- * @param {string[]} annotatorUsernames - 被分配的标注员列表
- * @param {Object} assignmentResult - 分配结果
- */
+/** 将任务分配结果推送给相关标注员和审核员。 */
 function notifyTaskAssigned(taskId, annotatorUsernames, assignmentResult) {
   const task = db.getById('tasks', taskId);
   const notifications = [];
@@ -603,11 +546,7 @@ function notifyTaskAssigned(taskId, annotatorUsernames, assignmentResult) {
   return notifications;
 }
 
-/**
- * 标注提交通知 — 推送给审核员
- * @param {Object} item - 标注项
- * @param {Object} annotator - 标注员信息
- */
+/** 将新提交的标注通知对应审核员。 */
 function notifyAnnotationSubmitted(item, annotator) {
   const task = db.getById('tasks', item.taskId);
   const notification = createNotification({
@@ -630,11 +569,7 @@ function notifyAnnotationSubmitted(item, annotator) {
   return notification;
 }
 
-/**
- * 标注重新提交通知 — 推送给审核员
- * @param {Object} item - 标注项
- * @param {Object} annotator - 标注员信息
- */
+/** 将重新提交的标注通知对应审核员。 */
 function notifyAnnotationResubmitted(item, annotator) {
   const task = db.getById('tasks', item.taskId);
   const notification = createNotification({
@@ -657,11 +592,7 @@ function notifyAnnotationResubmitted(item, annotator) {
   return notification;
 }
 
-/**
- * 规则预审完成通知 — 推送给审核员
- * @param {Object} item - 标注项
- * @param {Object} reviewRecord - 规则预审结果
- */
+/** 将规则预审结果通知对应审核员。 */
 function notifyAIReviewComplete(item, reviewRecord) {
   const task = db.getById('tasks', item.taskId);
   const notification = createNotification({
@@ -685,9 +616,7 @@ function notifyAIReviewComplete(item, reviewRecord) {
   return notification;
 }
 
-/**
- * 获取 Socket.IO 实例
- */
+/** 获取已初始化的 Socket.IO 实例。 */
 function getIO() {
   return io;
 }

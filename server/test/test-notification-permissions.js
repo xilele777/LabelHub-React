@@ -2,7 +2,7 @@
  * Notification permission isolation tests.
  *
  * Verifies:
- * 1. Rejected review notifications are delivered only to the target annotator.
+ * 1. Review results are delivered only to the target annotator.
  * 2. Fresh annotation submissions are not delivered to reviewers.
  * 3. Re-submitted rejected items are delivered only to the original reviewer.
  * 4. Clients cannot subscribe to unrelated task rooms.
@@ -94,7 +94,16 @@ async function runTests() {
 
   await wait(100);
 
-  console.log('1. Review rejection is delivered only to the assigned annotator');
+  console.log('1. Review results are delivered only to the assigned annotator');
+  notificationService.notifyReviewApproved(
+    {
+      id: 'notif_perm_approve_item',
+      taskId: 't001',
+      annotator: 'a',
+      reviewedAt: new Date().toISOString(),
+    },
+    { username: 'r' },
+  );
   notificationService.notifyReviewRejected(
     {
       id: 'notif_perm_reject_item',
@@ -108,6 +117,24 @@ async function runTests() {
 
   await wait(150);
 
+  assert(
+    annotator.notifications.some(
+      (n) => n.type === 'review_approved' && n.data?.dataItemId === 'notif_perm_approve_item',
+    ),
+    'annotator receives own review_approved notification',
+  );
+  assert(
+    !reviewer.notifications.some(
+      (n) => n.type === 'review_approved' && n.data?.dataItemId === 'notif_perm_approve_item',
+    ),
+    'reviewer does not receive annotator approval notification',
+  );
+  assert(
+    annotator.notifications
+      .find((n) => n.type === 'review_approved' && n.data?.dataItemId === 'notif_perm_approve_item')
+      ?.targetUsers?.includes('a'),
+    'review_approved notification carries targetUsers=annotator',
+  );
   assert(
     annotator.notifications.some(
       (n) => n.type === 'review_rejected' && n.data?.dataItemId === 'notif_perm_reject_item',

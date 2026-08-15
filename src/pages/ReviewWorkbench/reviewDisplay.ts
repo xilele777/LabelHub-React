@@ -11,7 +11,7 @@ import { ReviewStatus } from '../../types/aiReview';
 import { SEMANTIC_COLORS } from '../../utils/statusMeta';
 
 export const statusFilterOptions = [
-  { label: '规则预审中', value: 'ai_reviewing_group' },
+  { label: '已提交', value: DataItemStatus.SUBMITTED },
   { label: '待人工审核', value: DataItemStatus.PENDING_REVIEW },
   { label: '审核通过', value: DataItemStatus.REVIEWED },
   { label: '审核驳回', value: DataItemStatus.REJECTED },
@@ -25,8 +25,6 @@ export const aiReviewFilterOptions = [
 
 export const REVIEW_ACTIONABLE_STATUSES = new Set<DataItemStatus>([
   DataItemStatus.SUBMITTED,
-  DataItemStatus.AI_REVIEWING,
-  DataItemStatus.AI_REVIEWED,
   DataItemStatus.PENDING_REVIEW,
 ]);
 

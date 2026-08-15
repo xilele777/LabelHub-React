@@ -112,8 +112,6 @@ export default function ReviewWorkbench() {
           !item.archived &&
           [
             DataItemStatus.SUBMITTED,
-            DataItemStatus.AI_REVIEWING,
-            DataItemStatus.AI_REVIEWED,
             DataItemStatus.PENDING_REVIEW,
             DataItemStatus.REVIEWED,
             DataItemStatus.REJECTED,
@@ -361,13 +359,7 @@ export default function ReviewWorkbench() {
           }
         : { color: 'processing', label: '待审核' };
     }
-    if (
-      [DataItemStatus.SUBMITTED, DataItemStatus.AI_REVIEWING, DataItemStatus.AI_REVIEWED].includes(
-        item.status,
-      )
-    ) {
-      return { color: 'purple', label: '预审中' };
-    }
+    if (item.status === DataItemStatus.SUBMITTED) return { color: 'processing', label: '已提交' };
     if (item.status === DataItemStatus.REVIEWED) return { color: 'success', label: '已通过' };
     if (item.status === DataItemStatus.REJECTED) return { color: 'error', label: '已驳回' };
     return { color: 'default', label: statusLabel(item.status) };
@@ -589,7 +581,7 @@ export default function ReviewWorkbench() {
             <Select
               value={filters.aiReviewResult}
               allowClear
-              placeholder="AI 结论"
+              placeholder="预审结论"
               size="small"
               className="filter-select"
               options={aiReviewFilterOptions}

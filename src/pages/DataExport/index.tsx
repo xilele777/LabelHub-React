@@ -97,7 +97,7 @@ const COLUMNS: TableColumnsType<ExportRecord> = [
     },
   },
   {
-    title: 'AI',
+    title: '规则预审',
     key: 'aiReview',
     width: 84,
     responsive: ['lg'],

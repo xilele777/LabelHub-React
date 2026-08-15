@@ -1,11 +1,13 @@
-// ─── Constants ────────────────────────────────────────────
+/** 任务、标注项和审核项的开始时间、开放状态及超时判断。 */
+
+// 状态和触发动作。
 
 export const ANNOTATION_START_ACTIONS = ['assign_annotator', 'claim_assignment', 'reject'] as const;
 export const REVIEW_START_ACTIONS = ['assign_reviewer', 'claim_review'] as const;
 export const ANNOTATION_OPEN_STATUSES = ['pending', 'draft', 'rejected'] as const;
-export const REVIEW_OPEN_STATUSES = ['submitted', 'ai_reviewed', 'pending_review'] as const;
+export const REVIEW_OPEN_STATUSES = ['submitted', 'pending_review'] as const;
 
-// ─── Time helpers ─────────────────────────────────────────
+// 时间工具。
 
 function parseTime(value: string | null | undefined): number | null {
   if (!value) return null;
@@ -59,7 +61,7 @@ export function canTaskExposeWorkItems(
   return Boolean(task && isWorkStatus && isTaskStarted(task, now) && !isTaskExpired(task, now));
 }
 
-// ─── Audit history helpers ────────────────────────────────
+// 审计记录时间。
 
 interface AuditRecord {
   actionType?: string;
@@ -92,7 +94,7 @@ export function getItemStartTimestamp(
   );
 }
 
-// ─── Timeout helpers ──────────────────────────────────────
+// 超时配置。
 
 interface TaskLike {
   reviewTimeoutHours?: number | null;
@@ -113,7 +115,7 @@ export function getItemTimeoutHours(
   return Math.max(0, Number(value ?? 0));
 }
 
-// ─── Expiry check ─────────────────────────────────────────
+// 过期判断。
 
 interface ItemLike {
   reviewer?: string | null;

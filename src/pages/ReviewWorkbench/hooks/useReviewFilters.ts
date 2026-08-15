@@ -1,6 +1,6 @@
 // 管理审核工作台的筛选条件和筛选后的数据。
 import { useCallback, useMemo, useState } from 'react';
-import { DataItemStatus, type DataItem } from '../../../types';
+import type { DataItem } from '../../../types';
 import type { AIReviewResult } from '../../../types/aiReview';
 import { useDebounced } from '../../../hooks/useDebounced';
 
@@ -50,17 +50,7 @@ export function useReviewFilters(
   const filteredItems = useMemo(() => {
     let result = reviewableItems;
     if (filters.status) {
-      if (filters.status === 'ai_reviewing_group') {
-        result = result.filter((item) =>
-          [
-            DataItemStatus.SUBMITTED,
-            DataItemStatus.AI_REVIEWING,
-            DataItemStatus.AI_REVIEWED,
-          ].includes(item.status),
-        );
-      } else {
-        result = result.filter((item) => item.status === filters.status);
-      }
+      result = result.filter((item) => item.status === filters.status);
     }
     if (filters.taskId) result = result.filter((item) => item.taskId === filters.taskId);
     if (filters.annotator) result = result.filter((item) => item.annotator === filters.annotator);

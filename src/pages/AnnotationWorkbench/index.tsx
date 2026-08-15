@@ -43,7 +43,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { getTemplateSchemaAsync } from '../../utils/templateSchemaHelper';
 import { SEMANTIC_COLORS } from '../../utils/statusMeta';
-import { useDraftPersistence } from '../../hooks/useDraftPersistence';
+import { clearDraftRecord, useDraftPersistence } from '../../hooks/useDraftPersistence';
 import { useCrossTabLock } from '../../hooks/useCrossTabLock';
 import { useEditLock } from './hooks/useEditLock';
 import { useLivePreReview } from './hooks/useLivePreReview';
@@ -68,8 +68,6 @@ const dataStatusMeta: Record<DataItemStatus, { label: string; color: string }> =
   [DataItemStatus.PENDING]: { label: '待标注', color: 'default' },
   [DataItemStatus.DRAFT]: { label: '草稿', color: 'processing' },
   [DataItemStatus.SUBMITTED]: { label: '已提交', color: 'success' },
-  [DataItemStatus.AI_REVIEWING]: { label: '规则预审中', color: 'processing' },
-  [DataItemStatus.AI_REVIEWED]: { label: '规则已预审', color: 'cyan' },
   [DataItemStatus.PENDING_REVIEW]: { label: '待人工审核', color: 'orange' },
   [DataItemStatus.REVIEWED]: { label: '审核通过', color: 'green' },
   [DataItemStatus.REJECTED]: { label: '已驳回', color: 'red' },
@@ -203,8 +201,6 @@ export default function AnnotationWorkbench() {
     const status = currentItem?.status;
     return (
       status === DataItemStatus.SUBMITTED ||
-      status === DataItemStatus.AI_REVIEWING ||
-      status === DataItemStatus.AI_REVIEWED ||
       status === DataItemStatus.PENDING_REVIEW ||
       status === DataItemStatus.REVIEWED
     );
@@ -273,6 +269,11 @@ export default function AnnotationWorkbench() {
     };
     const handleNotification = (notification: Notification) => {
       if (!REFRESH_NOTIFICATION_TYPES.has(notification.type)) return;
+      const dataItemId = notification.data?.dataItemId;
+      if (notification.type === 'review_approved' && typeof dataItemId === 'string') {
+        clearDraftRecord(dataItemId);
+        void useAnnotationStore.getState().fetchArchivedItems();
+      }
       void useTaskStore.getState().fetchTasks();
       void socketCtxRef.current.refreshWorkbenchData();
       if (socketCtxRef.current.claimModalOpen) {
@@ -386,9 +387,10 @@ export default function AnnotationWorkbench() {
 
   // 自动保存草稿，并在恢复时校验服务端版本。
   const draft = useDraftPersistence({
-    key: currentItem?.id ?? null,
+    key: !isReadOnly ? (currentItem?.id ?? null) : null,
     version: currentItem?.version ?? 1,
     snapshot: formState,
+    baselineSnapshot: { ...(currentItem?.annotationData ?? {}) },
     restore: (data) => setFormState({ ...data }),
     onRestored: () => message.info('已恢复本地未提交的草稿修改'),
   });
@@ -509,12 +511,7 @@ export default function AnnotationWorkbench() {
       status === DataItemStatus.REJECTED
     )
       return 0;
-    if (
-      status === DataItemStatus.SUBMITTED ||
-      status === DataItemStatus.AI_REVIEWING ||
-      status === DataItemStatus.AI_REVIEWED
-    )
-      return 1;
+    if (status === DataItemStatus.SUBMITTED) return 1;
     if (status === DataItemStatus.PENDING_REVIEW) return 2;
     return 3;
   })();

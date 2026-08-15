@@ -1,13 +1,8 @@
 // 管理标注编辑过程中的实时规则预审结果。
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FieldType, type AnnotationTemplate, type DataItem } from '../../../types';
-import {
-  ReviewStatus,
-  type AIReviewResult,
-  type FieldWarning,
-  type Severity,
-} from '../../../types/aiReview';
-import { getNumberField, isEmpty } from '../fieldHelpers';
+import type { AnnotationTemplate, DataItem } from '../../../types';
+import { ReviewStatus, type AIReviewResult, type Severity } from '../../../types/aiReview';
+import { runAIReview } from '../../../services/aiReviewEngine';
 
 export interface UseLivePreReviewOptions {
   templateSchema: AnnotationTemplate | null;
@@ -37,121 +32,19 @@ function createEmptyReview(
   };
 }
 
-function calculateScore(warnings: FieldWarning[]) {
-  const deduction = warnings.reduce((sum, warning) => {
-    if (warning.severity === 'error') return sum + 30;
-    if (warning.severity === 'warning') return sum + 15;
-    return sum + 5;
-  }, 0);
-  return Math.max(0, 100 - deduction);
-}
-
-function deriveReviewStatus(score: number, warnings: FieldWarning[]) {
-  if (warnings.some((warning) => warning.severity === 'error') || score < 60)
-    return ReviewStatus.FAIL;
-  if (warnings.some((warning) => warning.severity === 'warning') || score < 80)
-    return ReviewStatus.RISK;
-  return ReviewStatus.PASS;
-}
-
-function buildReviewSummary(status: ReviewStatus, score: number) {
-  if (status === ReviewStatus.PASS) return `实时预审通过，质量评分 ${score} 分。`;
-  if (status === ReviewStatus.RISK)
-    return `实时预审发现风险项，质量评分 ${score} 分，建议提交前复核。`;
-  return `实时预审未通过，质量评分 ${score} 分，请修正严重问题后提交。`;
-}
-
 function runPreReview(
   templateSchema: AnnotationTemplate | null,
   currentItem: DataItem | null,
   formSnapshot: Record<string, unknown>,
 ): AIReviewResult {
   if (!templateSchema || !currentItem) return createEmptyReview(currentItem, templateSchema);
-
-  const warnings: FieldWarning[] = [];
-  for (const field of templateSchema.fields) {
-    if (field.type === FieldType.TITLE) continue;
-    // 使用防抖后的快照而非原始 formState，保持计算与触发方一致
-    const value = formSnapshot[field.fieldKey];
-
-    if (field.required && isEmpty(value)) {
-      warnings.push({
-        fieldKey: field.fieldKey,
-        fieldLabel: field.label,
-        message: `"${field.label}" 为必填字段`,
-        value,
-        severity: 'error',
-      });
-      continue;
-    }
-
-    if (field.type === FieldType.RATING && !isEmpty(value)) {
-      const maxScore = getNumberField(field, 'maxScore', 5) ?? 5;
-      const score = Number(value);
-      if (!Number.isFinite(score) || score < 0 || score > maxScore) {
-        warnings.push({
-          fieldKey: field.fieldKey,
-          fieldLabel: field.label,
-          message: `"${field.label}" 评分超出允许范围 0-${maxScore}`,
-          value,
-          severity: 'error',
-        });
-      } else if (score > 0 && score < 2) {
-        warnings.push({
-          fieldKey: field.fieldKey,
-          fieldLabel: field.label,
-          message: `"${field.label}" 评分偏低，建议复核标注判断`,
-          value,
-          severity: 'warning',
-        });
-      }
-    }
-
-    if ((field.type === FieldType.INPUT || field.type === FieldType.TEXTAREA) && !isEmpty(value)) {
-      const text = String(value);
-      const minLength = getNumberField(field, 'minLength', 2) ?? 2;
-      if (text.length < minLength) {
-        warnings.push({
-          fieldKey: field.fieldKey,
-          fieldLabel: field.label,
-          message: `"${field.label}" 文本过短，当前 ${text.length} 字符，建议至少 ${minLength} 字符`,
-          value,
-          severity: 'warning',
-        });
-      }
-    }
-
-    if (
-      [FieldType.RADIO, FieldType.CHECKBOX, FieldType.SELECT].includes(field.type) &&
-      !field.required &&
-      isEmpty(value)
-    ) {
-      warnings.push({
-        fieldKey: field.fieldKey,
-        fieldLabel: field.label,
-        message: `"${field.label}" 未选择，可能影响分类完整性`,
-        value,
-        severity: 'info',
-      });
-    }
-  }
-
-  const score = calculateScore(warnings);
-  const reviewStatus = deriveReviewStatus(score, warnings);
-  return {
-    id: `local_${currentItem.id}`,
+  return runAIReview({
+    template: templateSchema,
+    rawData: currentItem.rawData ?? {},
+    annotationResult: formSnapshot,
     dataItemId: currentItem.id,
     taskId: currentItem.taskId,
-    templateId: templateSchema.id,
-    reviewStatus,
-    score,
-    summary: buildReviewSummary(reviewStatus, score),
-    matchedRules: [],
-    fieldWarnings: warnings,
-    suggestions: [],
-    reviewedAt: new Date().toISOString(),
-    modelVersion: 'labelhub-local-watch-v1',
-  };
+  });
 }
 
 /**

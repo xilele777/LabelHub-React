@@ -587,9 +587,9 @@
       "auditHistory": [
         { "id": "h101", "operator": "annotator_wang", "actionType": "save_draft", "fromStatus": "pending", "toStatus": "draft", "reason": null, "timestamp": "2026-03-08T09:00:00Z" },
         { "id": "h102", "operator": "annotator_wang", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-08T09:20:00Z" },
-        { "id": "h103", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-03-08T09:20:01Z" },
-        { "id": "h104", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-03-08T09:20:06Z" },
-        { "id": "h105", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-08T09:20:07Z" },
+        { "id": "h103", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-08T09:20:01Z" },
+        { "id": "h104", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-08T09:20:06Z" },
+        { "id": "h105", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-08T09:20:07Z" },
         { "id": "h106", "operator": "r", "actionType": "approve", "fromStatus": "pending_review", "toStatus": "reviewed", "reason": null, "timestamp": "2026-03-09T14:00:00Z" }
       ]
     },
@@ -618,9 +618,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h111", "operator": "annotator_wang", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-10T10:15:00Z" },
-        { "id": "h112", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-03-10T10:15:01Z" },
-        { "id": "h113", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-03-10T10:15:06Z" },
-        { "id": "h114", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-10T10:15:07Z" },
+        { "id": "h112", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-10T10:15:01Z" },
+        { "id": "h113", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-10T10:15:06Z" },
+        { "id": "h114", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-10T10:15:07Z" },
         { "id": "h115", "operator": "r", "actionType": "approve", "fromStatus": "pending_review", "toStatus": "reviewed", "reason": null, "timestamp": "2026-03-11T16:30:00Z" }
       ]
     },
@@ -647,9 +647,9 @@
       "rejectReason": "遗漏大量实体：未标注"胸闷"、"气短"症状，未标注"他汀类药物"药物，未标注"前降支中段狭窄85%"检查结果，未标注"PCI术"治疗操作。请补充完整后重新提交。",
       "auditHistory": [
         { "id": "h121", "operator": "annotator_li", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-12T15:40:00Z" },
-        { "id": "h122", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-03-12T15:40:01Z" },
-        { "id": "h123", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-03-12T15:40:06Z" },
-        { "id": "h124", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-12T15:40:07Z" },
+        { "id": "h122", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-12T15:40:01Z" },
+        { "id": "h123", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-12T15:40:06Z" },
+        { "id": "h124", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-12T15:40:07Z" },
         { "id": "h125", "operator": "reviewer_zhang", "actionType": "reject", "fromStatus": "pending_review", "toStatus": "rejected", "reason": "遗漏大量实体：未标注\"胸闷\"、\"气短\"症状，未标注\"他汀类药物\"药物，未标注\"前降支中段狭窄85%\"检查结果，未标注\"PCI术\"治疗操作。请补充完整后重新提交。", "timestamp": "2026-03-13T10:00:00Z" }
       ]
     },
@@ -972,9 +972,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h231", "operator": "annotator_li", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T09:00:00Z" },
-        { "id": "h232", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-21T09:00:01Z" },
-        { "id": "h233", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-21T09:00:06Z" },
-        { "id": "h234", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T09:00:07Z" }
+        { "id": "h232", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T09:00:01Z" },
+        { "id": "h233", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T09:00:06Z" },
+        { "id": "h234", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T09:00:07Z" }
       ]
     },
     {
@@ -1242,9 +1242,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h261", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T09:15:00Z" },
-        { "id": "h262", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-19T09:15:01Z" },
-        { "id": "h263", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-19T09:15:05Z" },
-        { "id": "h264", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T09:15:06Z" }
+        { "id": "h262", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T09:15:01Z" },
+        { "id": "h263", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T09:15:05Z" },
+        { "id": "h264", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T09:15:06Z" }
       ]
     },
     {
@@ -1273,9 +1273,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h271", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T10:30:00Z" },
-        { "id": "h272", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-19T10:30:01Z" },
-        { "id": "h273", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-19T10:30:05Z" },
-        { "id": "h274", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T10:30:06Z" }
+        { "id": "h272", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T10:30:01Z" },
+        { "id": "h273", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T10:30:05Z" },
+        { "id": "h274", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T10:30:06Z" }
       ]
     },
     {
@@ -1304,9 +1304,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h281", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T11:45:00Z" },
-        { "id": "h282", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-19T11:45:01Z" },
-        { "id": "h283", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-19T11:45:05Z" },
-        { "id": "h284", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T11:45:06Z" }
+        { "id": "h282", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T11:45:01Z" },
+        { "id": "h283", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T11:45:05Z" },
+        { "id": "h284", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T11:45:06Z" }
       ]
     },
     {
@@ -1335,9 +1335,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h291", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T14:20:00Z" },
-        { "id": "h292", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-19T14:20:01Z" },
-        { "id": "h293", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-19T14:20:05Z" },
-        { "id": "h294", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T14:20:06Z" }
+        { "id": "h292", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T14:20:01Z" },
+        { "id": "h293", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T14:20:05Z" },
+        { "id": "h294", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T14:20:06Z" }
       ]
     },
     {
@@ -1367,9 +1367,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h301", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T16:00:00Z" },
-        { "id": "h302", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-19T16:00:01Z" },
-        { "id": "h303", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-19T16:00:05Z" },
-        { "id": "h304", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T16:00:06Z" }
+        { "id": "h302", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T16:00:01Z" },
+        { "id": "h303", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T16:00:05Z" },
+        { "id": "h304", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T16:00:06Z" }
       ]
     },
     {
@@ -1399,9 +1399,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h311", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T17:30:00Z" },
-        { "id": "h312", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-19T17:30:01Z" },
-        { "id": "h313", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-19T17:30:05Z" },
-        { "id": "h314", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T17:30:06Z" }
+        { "id": "h312", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-19T17:30:01Z" },
+        { "id": "h313", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T17:30:05Z" },
+        { "id": "h314", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-19T17:30:06Z" }
       ]
     },
     {
@@ -1431,9 +1431,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h321", "operator": "annotator_wang", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-20T08:00:00Z" },
-        { "id": "h322", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-20T08:00:01Z" },
-        { "id": "h323", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-20T08:00:05Z" },
-        { "id": "h324", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-20T08:00:06Z" }
+        { "id": "h322", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-20T08:00:01Z" },
+        { "id": "h323", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-20T08:00:05Z" },
+        { "id": "h324", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-20T08:00:06Z" }
       ]
     },
     {
@@ -1462,9 +1462,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h331", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-17T10:00:00Z" },
-        { "id": "h332", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-17T10:00:01Z" },
-        { "id": "h333", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-17T10:00:05Z" },
-        { "id": "h334", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T10:00:06Z" },
+        { "id": "h332", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-17T10:00:01Z" },
+        { "id": "h333", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T10:00:05Z" },
+        { "id": "h334", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T10:00:06Z" },
         { "id": "h335", "operator": "r", "actionType": "approve", "fromStatus": "pending_review", "toStatus": "reviewed", "reason": null, "timestamp": "2026-05-18T09:00:00Z" }
       ]
     },
@@ -1494,9 +1494,9 @@
       "rejectReason": "类别标注错误：图像明显为犬类（泰迪），但标注为"猫"，请核实后重新标注。",
       "auditHistory": [
         { "id": "h341", "operator": "a", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-17T11:00:00Z" },
-        { "id": "h342", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-17T11:00:01Z" },
-        { "id": "h343", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-17T11:00:05Z" },
-        { "id": "h344", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T11:00:06Z" },
+        { "id": "h342", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-17T11:00:01Z" },
+        { "id": "h343", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T11:00:05Z" },
+        { "id": "h344", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T11:00:06Z" },
         { "id": "h345", "operator": "r", "actionType": "reject", "fromStatus": "pending_review", "toStatus": "rejected", "reason": "类别标注错误：图像明显为犬类（泰迪），但标注为\"猫\"，请核实后重新标注。", "timestamp": "2026-05-18T10:00:00Z" }
       ]
     },
@@ -1526,9 +1526,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h351", "operator": "annotator_wang", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-17T14:00:00Z" },
-        { "id": "h352", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-17T14:00:01Z" },
-        { "id": "h353", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-17T14:00:05Z" },
-        { "id": "h354", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T14:00:06Z" },
+        { "id": "h352", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-17T14:00:01Z" },
+        { "id": "h353", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T14:00:05Z" },
+        { "id": "h354", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-17T14:00:06Z" },
         { "id": "h355", "operator": "reviewer_zhang", "actionType": "approve", "fromStatus": "pending_review", "toStatus": "reviewed", "reason": null, "timestamp": "2026-05-18T15:00:00Z" }
       ]
     },
@@ -1591,9 +1591,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h371", "operator": "annotator_li", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T14:00:00Z" },
-        { "id": "h372", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-21T14:00:01Z" },
-        { "id": "h373", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-21T14:00:06Z" },
-        { "id": "h374", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T14:00:07Z" }
+        { "id": "h372", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T14:00:01Z" },
+        { "id": "h373", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T14:00:06Z" },
+        { "id": "h374", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T14:00:07Z" }
       ]
     },
     {
@@ -1625,9 +1625,9 @@
       "rejectReason": "类别标注严重错误：这是农作物病害图像，类别应为"其他"而非"狗"。请确认后再提交。",
       "auditHistory": [
         { "id": "h381", "operator": "annotator_li", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T15:30:00Z" },
-        { "id": "h382", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-21T15:30:01Z" },
-        { "id": "h383", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-21T15:30:06Z" },
-        { "id": "h384", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T15:30:07Z" },
+        { "id": "h382", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T15:30:01Z" },
+        { "id": "h383", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T15:30:06Z" },
+        { "id": "h384", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T15:30:07Z" },
         { "id": "h385", "operator": "r", "actionType": "reject", "fromStatus": "pending_review", "toStatus": "rejected", "reason": "类别标注严重错误：这是农作物病害图像，类别应为\"其他\"而非\"狗\"。请确认后再提交。", "timestamp": "2026-05-22T09:00:00Z" }
       ]
     },
@@ -1660,9 +1660,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h391", "operator": "annotator_wang", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-20T10:00:00Z" },
-        { "id": "h392", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-20T10:00:01Z" },
-        { "id": "h393", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-20T10:00:06Z" },
-        { "id": "h394", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-20T10:00:07Z" },
+        { "id": "h392", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-20T10:00:01Z" },
+        { "id": "h393", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-20T10:00:06Z" },
+        { "id": "h394", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-20T10:00:07Z" },
         { "id": "h395", "operator": "reviewer_zhang", "actionType": "approve", "fromStatus": "pending_review", "toStatus": "reviewed", "reason": null, "timestamp": "2026-05-21T09:00:00Z" }
       ]
     },
@@ -1693,9 +1693,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h401", "operator": "annotator_wang", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T16:00:00Z" },
-        { "id": "h402", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-05-21T16:00:01Z" },
-        { "id": "h403", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-05-21T16:00:06Z" },
-        { "id": "h404", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T16:00:07Z" }
+        { "id": "h402", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-05-21T16:00:01Z" },
+        { "id": "h403", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T16:00:06Z" },
+        { "id": "h404", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-05-21T16:00:07Z" }
       ]
     },
     {
@@ -1725,9 +1725,9 @@
       "rejectReason": null,
       "auditHistory": [
         { "id": "h411", "operator": "annotator_wang", "actionType": "submit", "fromStatus": "draft", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-15T11:00:00Z" },
-        { "id": "h412", "operator": "AI系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "ai_reviewing", "reason": null, "timestamp": "2026-03-15T11:00:01Z" },
-        { "id": "h413", "operator": "AI系统", "actionType": "ai_review_complete", "fromStatus": "ai_reviewing", "toStatus": "ai_reviewed", "reason": null, "timestamp": "2026-03-15T11:00:06Z" },
-        { "id": "h414", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "ai_reviewed", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-15T11:00:07Z" },
+        { "id": "h412", "operator": "规则系统", "actionType": "ai_review_start", "fromStatus": "submitted", "toStatus": "submitted", "reason": null, "timestamp": "2026-03-15T11:00:01Z" },
+        { "id": "h413", "operator": "规则系统", "actionType": "ai_review_complete", "fromStatus": "submitted", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-15T11:00:06Z" },
+        { "id": "h414", "operator": "系统", "actionType": "assign_reviewer", "fromStatus": "pending_review", "toStatus": "pending_review", "reason": null, "timestamp": "2026-03-15T11:00:07Z" },
         { "id": "h415", "operator": "reviewer_zhang", "actionType": "approve", "fromStatus": "pending_review", "toStatus": "reviewed", "reason": null, "timestamp": "2026-03-16T09:00:00Z" }
       ]
     },

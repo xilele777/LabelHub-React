@@ -14,8 +14,6 @@ const STATUS_CHART_COLOR_MAP: Record<DataItemStatus, string> = {
   [DataItemStatus.PENDING]: '#8c8c8c',
   [DataItemStatus.DRAFT]: SEMANTIC_COLORS.warning,
   [DataItemStatus.SUBMITTED]: SEMANTIC_COLORS.primary,
-  [DataItemStatus.AI_REVIEWING]: '#597ef7',
-  [DataItemStatus.AI_REVIEWED]: '#13c2c2',
   [DataItemStatus.PENDING_REVIEW]: '#fa8c16',
   [DataItemStatus.REVIEWED]: SEMANTIC_COLORS.success,
   [DataItemStatus.REJECTED]: SEMANTIC_COLORS.danger,
@@ -76,8 +74,6 @@ const REVIEWED_STATUSES = new Set<DataItemStatus>([
 
 const SUBMITTED_STATUSES = new Set<DataItemStatus>([
   DataItemStatus.SUBMITTED,
-  DataItemStatus.AI_REVIEWING,
-  DataItemStatus.AI_REVIEWED,
   DataItemStatus.PENDING_REVIEW,
   DataItemStatus.REVIEWED,
   DataItemStatus.REJECTED,

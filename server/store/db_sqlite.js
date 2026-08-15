@@ -1,3 +1,6 @@
+/**
+ * SQLite 数据库适配器：初始化表结构，并提供统一的查询、事务和 CRUD 接口。
+ */
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
@@ -16,15 +19,15 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-// ─── Initialize SQLite database ────────────────────────────
+// 初始化 SQLite 数据库。
 const db = new Database(DB_PATH);
 
-// Enable WAL mode for better concurrent read performance
+// WAL 模式可以提高并发读取能力。
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.pragma('busy_timeout = 5000');
 
-// ─── Migration: add columns for older databases ─────────────
+// 为旧数据库补充新增字段。
 const migrations = [
   { table: 'users', column: 'passwordChangedAt', type: 'TEXT' },
   { table: 'annotation_items', column: 'version', type: 'INTEGER NOT NULL DEFAULT 1' },
@@ -53,7 +56,7 @@ const migrations = [
 function runMigrations() {
   for (const mig of migrations) {
     try {
-      // Check if column already exists
+      // 已存在的字段无需重复迁移。
       const cols = db.pragma(`table_info(${mig.table})`);
       const exists = cols.some((c) => c.name === mig.column);
       if (!exists) {
@@ -65,7 +68,7 @@ function runMigrations() {
     }
   }
 
-  // ─── Create tables ─────────────────────────────────────────
+  // 创建表结构。
 }
 
 db.exec(`
@@ -203,8 +206,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_web_vitals_name ON web_vitals(name);
 `);
 
-// ─── Prepared statements (for performance) ─────────────────
+// 预编译语句。
 runMigrations();
+db.prepare(
+  "UPDATE annotation_items SET status = 'pending_review', version = version + 1 WHERE status IN ('ai_reviewing', 'ai_reviewed')",
+).run();
 
 const stmts = {
   users: {
@@ -339,7 +345,7 @@ const stmts = {
   },
 };
 
-// ─── JSON parse helper ──────────────────────────────────────
+// JSON 字段转换。
 function safeParse(jsonStr) {
   if (jsonStr === null || jsonStr === undefined) return null;
   try {
@@ -349,8 +355,7 @@ function safeParse(jsonStr) {
   }
 }
 
-// ─── Row-to-object transformers ─────────────────────────────
-// Convert SQLite row (with JSON text columns) to JS object
+// 将 SQLite 行转换为业务对象。
 function transformUser(row) {
   if (!row) return null;
   return {
@@ -485,7 +490,7 @@ function transformNotification(row) {
   };
 }
 
-// ─── Collection config map ──────────────────────────────────
+// 集合与表字段配置。
 const COLLECTIONS = {
   users: {
     stmts: stmts.users,
@@ -731,30 +736,23 @@ function assertSafeSortField(name, sortField) {
   }
 }
 
-// ─── Generic CRUD API (compatible with old db.js interface) ──
+// 通用 CRUD 接口，保持与旧版 db.js 兼容。
 
-/**
- * Get all items from a collection.
- */
+/** 查询集合中的全部数据。 */
 function getAll(name) {
   const coll = getCollection(name);
   const rows = coll.stmts.getAll.all();
   return rows.map(coll.transform);
 }
 
-/**
- * Get a single item by id.
- */
+/** 按 ID 查询单条数据。 */
 function getById(name, id) {
   const coll = getCollection(name);
   const row = coll.stmts.getById.get(id);
   return coll.transform(row);
 }
 
-/**
- * Find items matching a filter object (key-value pairs).
- * Only supports simple equality filters on top-level scalar fields.
- */
+/** 按顶层标量字段做等值筛选。 */
 function find(name, filter = {}) {
   const coll = getCollection(name);
   const { where, params } = buildWhereClause(name, filter);
@@ -763,9 +761,7 @@ function find(name, filter = {}) {
   return rows.map(coll.transform);
 }
 
-/**
- * List items with database-level filtering, sorting, and pagination.
- */
+/** 在数据库层完成筛选、排序和分页。 */
 function list(name, options = {}) {
   const coll = getCollection(name);
   const filter = options.filter || {};
@@ -791,41 +787,34 @@ function list(name, options = {}) {
   return { items, total, page, limit: limit || total };
 }
 
-/**
- * Find one item matching a filter.
- */
+/** 查询第一条符合条件的数据。 */
 function findOne(name, filter = {}) {
   const results = find(name, filter);
   return results.length > 0 ? results[0] : null;
 }
 
-/**
- * Insert an item into a collection.
- */
+/** 向集合写入一条数据。 */
 function insert(name, item) {
   const coll = getCollection(name);
   coll.stmts.insert.run(...coll.insertFields(item));
   return item;
 }
 
-/**
- * Update an item by id (partial merge).
- * Reads the existing row, merges updates, then writes back.
- */
+/** 按 ID 合并更新字段并写回数据库。 */
 function updateById(name, id, updates) {
   const coll = getCollection(name);
   const existing = getById(name, id);
   if (!existing) return null;
 
   const merged = { ...existing, ...updates };
-  // Prevent id from being changed
+  // 主键不允许通过更新操作修改。
   merged.id = id;
 
-  // For annotation-items, auto-increment version on every update
+  // 标注项内容更新时自动增加版本号。
   if (name === 'annotation-items' && !updates._skipVersionIncrement) {
     merged.version = (existing.version || 1) + 1;
   }
-  // Clean internal flags before persistence
+  // 内部控制字段不写入数据库。
   delete merged._skipVersionIncrement;
 
   const updateData = coll.updateFields(merged);
@@ -833,16 +822,12 @@ function updateById(name, id, updates) {
   return getById(name, id);
 }
 
-/**
- * Optimistic-lock aware update for annotation-items.
- * Returns { conflict: true, currentVersion, serverItem } on version mismatch,
- * or { conflict: false, updatedItem } on success.
- */
+/** 使用版本号更新标注项，冲突时返回服务端最新数据。 */
 function updateWithVersionCheck(id, updates, clientVersion) {
   const existing = getById('annotation-items', id);
   if (!existing) return { conflict: false, updatedItem: null };
 
-  // Optimistic lock: check version
+  // 客户端版本落后时拒绝覆盖。
   if (clientVersion !== undefined && clientVersion !== null && existing.version !== clientVersion) {
     return {
       conflict: true,
@@ -851,21 +836,17 @@ function updateWithVersionCheck(id, updates, clientVersion) {
     };
   }
 
-  // Version matches (or not provided for non-annotator ops), proceed with update
+  // 版本一致，或内部操作未携带版本时继续更新。
   const updatedItem = updateById('annotation-items', id, updates);
   return { conflict: false, updatedItem };
 }
 
-/**
- * Claim (pessimistic lock) an annotation item for editing.
- * Returns { claimed: true, item } on success, or { claimed: false, lockedBy, lockedAt } if already locked.
- * Auto-expires stale locks older than lockTimeoutMs.
- */
+/** 获取标注项的编辑锁，超时锁允许被重新领取。 */
 function claimItem(id, username, lockTimeoutMs = 30 * 60 * 1000) {
   const existing = getById('annotation-items', id);
   if (!existing) return { claimed: false, notFound: true };
 
-  // Check if already locked by someone else (and lock hasn't expired)
+  // 未过期且由其他用户持有的锁不能抢占。
   if (existing.lockedBy && existing.lockedBy !== username && existing.lockedAt) {
     const lockAge = Date.now() - new Date(existing.lockedAt).getTime();
     if (lockAge < lockTimeoutMs) {
@@ -875,7 +856,7 @@ function claimItem(id, username, lockTimeoutMs = 30 * 60 * 1000) {
         lockedAt: existing.lockedAt,
       };
     }
-    // Lock expired → allow re-claim
+    // 锁已过期，允许重新领取。
   }
 
   const now = new Date().toISOString();
@@ -887,10 +868,7 @@ function claimItem(id, username, lockTimeoutMs = 30 * 60 * 1000) {
   return { claimed: true, item: updatedItem };
 }
 
-/**
- * Release (unlock) an annotation item.
- * Only the lock owner (or owner role) can release.
- */
+/** 释放当前用户持有的标注项编辑锁。 */
 function releaseItem(id, username) {
   const existing = getById('annotation-items', id);
   if (!existing) return { released: false, notFound: true };
@@ -907,9 +885,7 @@ function releaseItem(id, username) {
   return { released: true, item: updatedItem };
 }
 
-/**
- * Release all locks held by a specific user (e.g., on logout).
- */
+/** 释放指定用户持有的全部编辑锁。 */
 function releaseAllByUser(username) {
   const items = getAll('annotation-items');
   let count = 0;
@@ -926,9 +902,7 @@ function releaseAllByUser(username) {
   return count;
 }
 
-/**
- * Clean up expired locks across all annotation items.
- */
+/** 清理全部标注项中的过期锁。 */
 function cleanExpiredLocks(lockTimeoutMs = 30 * 60 * 1000) {
   const items = getAll('annotation-items');
   let count = 0;
@@ -949,9 +923,7 @@ function cleanExpiredLocks(lockTimeoutMs = 30 * 60 * 1000) {
   return count;
 }
 
-/**
- * Replace an item by id (full replace).
- */
+/** 按 ID 完整替换一条数据。 */
 function replaceById(name, id, newItem) {
   const coll = getCollection(name);
   newItem.id = id;
@@ -960,18 +932,14 @@ function replaceById(name, id, newItem) {
   return getById(name, id);
 }
 
-/**
- * Delete an item by id.
- */
+/** 按 ID 删除数据。 */
 function deleteById(name, id) {
   const coll = getCollection(name);
   const result = coll.stmts.delete.run(id);
   return result.changes > 0;
 }
 
-/**
- * Count items in a collection, optionally filtered.
- */
+/** 统计集合数据量，可附带筛选条件。 */
 function count(name, filter = {}) {
   if (Object.keys(filter).length === 0) {
     const coll = getCollection(name);
@@ -984,10 +952,7 @@ function count(name, filter = {}) {
   return row.total;
 }
 
-/**
- * Bulk seed: replace entire collection.
- * Uses a transaction for atomicity.
- */
+/** 在事务中清空并重建整个集合。 */
 function seed(name, data) {
   const coll = getCollection(name);
   const tableName = getTableName(name);
@@ -1002,24 +967,18 @@ function seed(name, data) {
   truncateAndInsert(data);
 }
 
-/**
- * Map collection name to SQL table name.
- */
+/** 将业务集合名转换为 SQL 表名。 */
 function getTableName(collectionName) {
-  // 'annotation-items' -> 'annotation_items'
+  // annotation-items 对应 annotation_items。
   return collectionName.replace(/-/g, '_');
 }
 
-/**
- * Run a function inside a transaction.
- */
+/** 在事务中执行函数。 */
 function transaction(fn) {
   return db.transaction(fn)();
 }
 
-/**
- * Check if the database has been seeded (has any data).
- */
+/** 根据用户表判断数据库是否已初始化。 */
 function isSeeded() {
   const row = db.prepare('SELECT COUNT(*) AS total FROM users').get();
   return row.total > 0;
@@ -1297,6 +1256,6 @@ module.exports = {
   getOwnerPublishedNotificationRows,
   getPublishedNotificationRowsByPublishId,
   updatePublishedNotificationData,
-  // Export db instance for advanced use
+  // 保留原始数据库实例，供种子事务等底层操作使用。
   _db: db,
 };

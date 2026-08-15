@@ -8,7 +8,7 @@
  *   2. 模板管理 (CRUD)
  *   3. 任务管理 (CRUD + 关联模板)
  *   4. 数据导入 (批量创建标注项)
- *   5. 标注工作流 (保存草稿 → 提交 → AI预审 → 人工审核通过/驳回 → 重新提交)
+ *   5. 标注工作流 (保存草稿 → 提交 → 规则预审 → 人工审核通过/驳回 → 重新提交)
  *   6. 审核结果查询
  *   7. 数据统计 & 边界场景
  *
@@ -503,11 +503,11 @@ async function step4_dataImport() {
 }
 
 async function step5_annotationWorkflow() {
-  console.log('\n━━━ 步骤5: 标注工作流 (草稿→提交→AI预审→审核) ━━━');
+  console.log('\n━━━ 步骤5: 标注工作流 (草稿→提交→规则预审→审核) ━━━');
 
   const [id1, id2, id3, id4, id5] = ctx.dataItemIds;
 
-  // ── 5A: 完整正向流程 (草稿 → 提交 → AI预审 → 人工审核通过) ──
+  // ── 5A: 完整正向流程 (草稿 → 提交 → 规则预审 → 人工审核通过) ──
   console.log('\n  ▸ 5A: 正向流程 - 审核通过');
 
   // 保存草稿（初始版本号为 1）
@@ -526,7 +526,7 @@ async function step5_annotationWorkflow() {
   assertGte(draft1.body.data.auditHistory.length, 1, '审计历史记录 >= 1');
   const itemV1 = draft1.body.data.version; // 保存草稿后版本号自动递增
 
-  // 提交标注（自动触发 AI 预审，状态直接推进到 pending_review）
+  // 提交标注（自动触发规则预审，状态直接推进到 pending_review）
   const submit1 = await request(
     'PUT',
     `/api/annotation-items/${id1}/submit`,
@@ -540,12 +540,12 @@ async function step5_annotationWorkflow() {
   assertEq(
     submit1.body.data.item.status,
     'pending_review',
-    '状态变为 pending_review（AI预审自动完成）',
+    '状态变为 pending_review（规则预审自动完成）',
   );
   assertTruthy(submit1.body.data.item.submittedAt, '有提交时间');
-  assertTruthy(submit1.body.data.review, '返回 AI 预审结果');
+  assertTruthy(submit1.body.data.review, '返回规则预审结果');
   ctx.reviewId = submit1.body.data.review.id;
-  const itemV2 = submit1.body.data.item.version; // 提交+AI预审后版本号
+  const itemV2 = submit1.body.data.item.version; // 提交并完成规则预审后的版本号
 
   // 人工审核通过
   const approve1 = await request(
@@ -559,6 +559,8 @@ async function step5_annotationWorkflow() {
   );
   assertEq(approve1.body.code, 200, '审核通过成功');
   assertEq(approve1.body.data.status, 'reviewed', '状态变为 reviewed');
+  assertEq(approve1.body.data.archived, true, '审核通过后自动归档');
+  assertTruthy(approve1.body.data.archivedAt, '审核通过后记录归档时间');
   assertEq(approve1.body.data.reviewer, 'r', '审核员为 reviewer');
   assertTruthy(approve1.body.data.reviewedAt, '有审核时间');
 
@@ -572,10 +574,10 @@ async function step5_annotationWorkflow() {
   assert(actionTypes.includes('ai_review_complete'), '审计历史包含 ai_review_complete');
   assert(actionTypes.includes('approve'), '审计历史包含 approve');
 
-  // ── 5B: 驳回流程 (提交 → AI预审自动完成 → 人工驳回 → 重新提交) ──
+  // ── 5B: 驳回流程 (提交 → 规则预审自动完成 → 人工驳回 → 重新提交) ──
   console.log('\n  ▸ 5B: 驳回流程 - 驳回后重新提交');
 
-  // 直接提交（跳过草稿），AI预审自动完成（id2 初始版本号为 1）
+  // 直接提交（跳过草稿），规则预审自动完成（id2 初始版本号为 1）
   const submit2 = await request(
     'PUT',
     `/api/annotation-items/${id2}/submit`,
@@ -590,10 +592,10 @@ async function step5_annotationWorkflow() {
   assertEq(
     submit2.body.data.item.status,
     'pending_review',
-    '提交后状态为 pending_review（AI预审自动完成）',
+    '提交后状态为 pending_review（规则预审自动完成）',
   );
-  assertTruthy(submit2.body.data.review, '返回 AI 预审结果');
-  const id2SubmitVer = submit2.body.data.item.version; // 提交+AI预审后版本号
+  assertTruthy(submit2.body.data.review, '返回规则预审结果');
+  const id2SubmitVer = submit2.body.data.item.version; // 提交并完成规则预审后的版本号
 
   // 人工驳回
   const reject2 = await request(
@@ -625,12 +627,12 @@ async function step5_annotationWorkflow() {
     ctx.annotatorToken,
   );
   assertEq(resubmit2.body.code, 200, '重新提交成功');
-  // resubmit also returns { item, review } format with auto AI review
+  // 重新提交同样返回自动规则预审后的 { item, review }
   assertEq(resubmit2.body.data.item.status, 'pending_review', '重新提交后状态为 pending_review');
   assertEq(resubmit2.body.data.item.rejectReason, null, '重新提交后驳回原因已清除');
 
-  // ── 5C: 提交有问题的标注（触发 AI 预审规则） ──
-  console.log('\n  ▸ 5C: AI预审失败场景');
+  // ── 5C: 提交有问题的标注（触发规则预审） ──
+  console.log('\n  ▸ 5C: 规则预审失败场景');
 
   // 提交缺少必填字段 + 低评分的标注，触发 R001（必填缺失，-30）+ R006（低评分风险，-15）= 55分 FAIL
   // id3 初始版本号为 1
@@ -644,15 +646,15 @@ async function step5_annotationWorkflow() {
     ctx.annotatorToken,
   );
   assertEq(submit3.body.code, 200, '提交有问题的标注成功');
-  // AI review runs automatically, check the review result
-  assertTruthy(submit3.body.data.review, '返回 AI 预审结果');
-  // AI engine should detect: R001 (required field 'category' empty, -30) + R006 (low rating, -15) = score 55 → FAIL
+  // 规则预审自动执行并返回结果。
+  assertTruthy(submit3.body.data.review, '返回规则预审结果');
+  // 规则引擎应命中 R001（必填字段 category 为空，-30）和 R006（低评分，-15）。
   assertTruthy(
     submit3.body.data.review.score < 80,
-    `AI审核评分较低（实际: ${submit3.body.data.review.score}）`,
+    `预审评分较低（实际: ${submit3.body.data.review.score}）`,
   );
-  assertEq(submit3.body.data.review.reviewStatus, 'fail', 'AI审核状态为 fail');
-  const id3SubmitVer = submit3.body.data.item.version; // 提交+AI预审后版本号
+  assertEq(submit3.body.data.review.reviewStatus, 'fail', '预审状态为 fail');
+  const id3SubmitVer = submit3.body.data.item.version; // 提交并完成规则预审后的版本号
 
   // ── 5D: 驳回缺少原因 ──
   console.log('\n  ▸ 5D: 驳回缺少原因');

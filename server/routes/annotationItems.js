@@ -1,4 +1,8 @@
-﻿const express = require('express');
+﻿/**
+ * 标注项接口：领取、保存、提交、审核、驳回及批量导入。
+ * 这里集中处理状态迁移、权限、锁和时效校验。
+ */
+const express = require('express');
 const createCrudRouter = require('./crudFactory');
 const db = require('../store/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
@@ -33,12 +37,12 @@ const {
 const router = express.Router();
 router.use(requireAuth);
 
-// ===== Lock timeout: 30 minutes =====
+// 锁最长保留 30 分钟，过期后由请求触发清理。
 const LOCK_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_BATCH_IMPORT_ITEMS = Number(process.env.MAX_BATCH_IMPORT_ITEMS || 1000);
 
 /**
- * Middleware: clean expired locks periodically (once per 60s at most).
+ * 定期清理过期锁，单次请求最多每 60 秒执行一次。
  */
 let lastCleanup = 0;
 function cleanupExpiredLocks(req, res, next) {
@@ -121,28 +125,25 @@ router.post('/batch-import', requireRole('owner'), batchImportLimiter, (req, res
   );
 });
 
-// ===== RBAC helpers =====
+// 权限辅助方法。
 
 /**
- * Check if the current user owns this annotation item.
- * An annotator "owns" an item ONLY if they are the assigned annotator.
- * Unassigned items must be explicitly claimed via claim-assignment first.
+ * 只有被明确分配的标注员才拥有该标注项，未分配项必须先领取。
  */
 function isAnnotatorOwner(item, user) {
   if (user.role !== 'annotator') return false;
-  // annotator owns it ONLY if they are the assigned annotator
+  // 标注员只能操作分配给自己的项。
   return item.annotator === user.username;
 }
 
 /**
- * Check if the current user can review this item (reviewer role).
- * Implements avoidance principle: reviewer cannot review their own annotation.
+ * 判断审核员能否审核该项，审核员不能审核自己的标注。
  */
 function canReviewerApprove(item, user) {
   if (user.role !== 'reviewer') return false;
-  // Avoidance: reviewer cannot review their own annotation
+  // 避免自审。
   if (item.annotator === user.username) return false;
-  // Reviewer can review items assigned to them, or unassigned pending_review items
+  // 可审核分配给自己的项，或未指定审核员的待审项。
   return item.reviewer === null || item.reviewer === user.username;
 }
 
@@ -240,14 +241,12 @@ function wasReturnedToPoolByOverdue(item, phase) {
   return itemTimeliness.isItemExpired(task, item, phase);
 }
 
-// ===== Custom routes that must be registered BEFORE CRUD router =====
-// (CRUD router's GET /:id would otherwise match /available, etc.)
+// 特殊路由必须先于 CRUD 注册，否则会被 /:id 截获。
 
 /**
  * GET /annotation-items/available
- * List unassigned annotation items that the current annotator can claim.
- * RBAC: annotator + owner
- * Query params: taskId (optional), status (optional, defaults to pending)
+ * 查询当前用户可以领取的未分配标注项。
+ * 支持按任务和状态筛选，默认只返回 pending 项。
  */
 router.get('/available', (req, res) => {
   if (req.currentUser.role !== 'annotator') {
@@ -261,7 +260,7 @@ router.get('/available', (req, res) => {
 
   let items = db.getAll('annotation-items');
 
-  // Only show unassigned, active items in the requested statuses.
+  // 只返回未分配且状态符合要求的项。
   items = items.filter(
     (item) =>
       item.annotator === null &&
@@ -270,18 +269,18 @@ router.get('/available', (req, res) => {
       statuses.includes(item.status),
   );
 
-  // Only expose items from tasks that are open for work.
+  // 任务未开始或已结束时不暴露标注项。
   items = items.filter((item) => {
     const task = db.getById('tasks', item.taskId);
     return canTaskExposeWorkItems(task);
   });
 
-  // Filter by task when requested.
+  // 按任务筛选。
   if (taskId) {
     items = items.filter((item) => item.taskId === taskId);
   }
 
-  // Return the fields needed by the claim list.
+  // 列表只返回领取页面需要的字段。
   items = items.map((item) => ({
     id: item.id,
     taskId: item.taskId,
@@ -308,7 +307,7 @@ router.get('/review-available', (req, res) => {
   const taskId = req.query.taskId;
   const statuses = req.query.status
     ? String(req.query.status).split(',')
-    : ['submitted', 'ai_reviewed', 'pending_review'];
+    : ['submitted', 'pending_review'];
 
   let items = db
     .getAll('annotation-items')
@@ -349,7 +348,7 @@ router.get('/review-available', (req, res) => {
   res.success({ items: simplified, total: simplified.length });
 });
 
-// ===== Basic CRUD for annotation-items 鈥?with RBAC + status transition validation =====
+// 标注项通用 CRUD，并附加权限和状态迁移校验。
 router.put('/batch-claim-assignment', (req, res) => {
   if (req.currentUser.role !== 'annotator') {
     return res.fail('Only annotators can claim annotation items', 403);
@@ -467,7 +466,7 @@ router.put('/batch-claim-review', (req, res) => {
       failed.push({ id, reason: 'Review item is overdue and cannot be claimed' });
       return;
     }
-    if (!['submitted', 'ai_reviewed', 'pending_review'].includes(item.status)) {
+    if (!['submitted', 'pending_review'].includes(item.status)) {
       failed.push({ id, reason: 'Current status cannot be claimed for review' });
       return;
     }
@@ -514,21 +513,19 @@ router.put('/batch-claim-review', (req, res) => {
 });
 
 const crud = createCrudRouter('annotation-items', {
-  // Annotators only see their own items; reviewers see items assigned to them or pending review;
-  // owners see everything
+  // 标注员只看自己的项，审核员只看负责的待审项，负责人可以查看全部。
   filterList(items, req) {
-    // Exclude archived annotation items unless archived=true is requested.
+    // 默认排除归档项，明确请求 archived=true 时才查看历史数据。
     const showArchived = req.query.archived === 'true';
     let filtered = items;
     if (!showArchived) {
       filtered = items.filter((item) => !item.archived);
     } else {
-      // In archive mode, only show archived items.
+      // 归档模式只显示已归档项。
       filtered = items.filter((item) => item.archived);
     }
 
-    // Outside archive mode, only show items from tasks that are open for work.
-    // Archive mode keeps historical reviewed data visible.
+    // 非归档模式只显示当前开放任务中的项，归档模式保留历史审核数据。
     if (!showArchived) {
       filtered = filtered.filter((item) => {
         const task = db.getById('tasks', item.taskId);
@@ -542,8 +539,7 @@ const crud = createCrudRouter('annotation-items', {
       if (showArchived) {
         return filtered.filter((item) => item.annotator === req.currentUser.username);
       }
-      // Annotators only see items explicitly assigned to them.
-      // Unassigned items must be claimed through claim-assignment first.
+      // 标注员只能查看明确分配给自己的项，未分配项需先领取。
       return filtered.filter((item) => {
         const task = db.getById('tasks', item.taskId);
         return (
@@ -556,7 +552,7 @@ const crud = createCrudRouter('annotation-items', {
       if (showArchived) {
         return filtered.filter((item) => item.reviewer === req.currentUser.username);
       }
-      // Reviewer only sees review items explicitly assigned/claimed by them.
+      // 审核员只能查看分配或领取给自己的待审项。
       return filtered.filter((item) => {
         const task = db.getById('tasks', item.taskId);
         return (
@@ -567,7 +563,7 @@ const crud = createCrudRouter('annotation-items', {
     }
     return filtered;
   },
-  // afterRead keeps legacy seed data compatible with the frontend contract.
+  // 兼容旧种子数据，确保返回结构符合前端约定。
   afterRead(item, _req) {
     if (item.lockedBy === undefined) item.lockedBy = null;
     if (item.lockedAt === undefined) item.lockedAt = null;
@@ -575,18 +571,18 @@ const crud = createCrudRouter('annotation-items', {
     return item;
   },
   beforeCreate(item, req) {
-    // Only owner can create annotation items directly
+    // 只有负责人可以直接创建标注项。
     if (req.currentUser.role !== 'owner') {
       return 'Only owners can create annotation items';
     }
-    // Ensure newly created items include lock metadata.
+    // 新建项补齐锁字段。
     if (item.lockedBy === undefined) item.lockedBy = null;
     if (item.lockedAt === undefined) item.lockedAt = null;
     if (item.version === undefined) item.version = 1;
     return item;
   },
   beforeUpdate(existing, updates, req) {
-    // RBAC: annotator can update own items, reviewer/owner cannot update annotation data via generic PUT
+    // 通用 PUT 仅允许标注员修改自己的项，审核员和负责人使用专用操作接口。
     const role = req.currentUser.role;
     if (role === 'annotator') {
       if (!isAnnotatorOwner(existing, req.currentUser)) {
@@ -596,7 +592,7 @@ const crud = createCrudRouter('annotation-items', {
       return 'Only annotators can update annotation data';
     }
 
-    // If the request is trying to change status, validate the transition
+    // 修改状态时必须通过状态机校验。
     if (updates.status && updates.status !== existing.status) {
       const { valid, reason } = validateTransition(
         DATA_ITEM_TRANSITIONS,
@@ -608,7 +604,7 @@ const crud = createCrudRouter('annotation-items', {
       }
     }
 
-    // Optimistic lock: check version for annotation-items PUT
+    // 标注项更新使用版本号做乐观锁校验。
     if (
       updates.version !== undefined &&
       updates.version !== null &&
@@ -620,7 +616,7 @@ const crud = createCrudRouter('annotation-items', {
     return undefined;
   },
   beforeDelete(existing, req) {
-    // Only owner can delete annotation items
+    // 只有负责人可以删除标注项。
     if (req.currentUser.role !== 'owner') {
       return 'Only owners can delete annotation items';
     }
@@ -631,9 +627,8 @@ router.use(crud);
 
 /**
  * PUT /annotation-items/:id/save-draft
- * Body: { annotationData }
- * Save draft annotation and set status to 'draft'.
- * RBAC: annotator (own items only, or auto-claim unassigned items) + owner
+ * 请求体：{ annotationData }
+ * 保存草稿并将状态设为 draft；未分配项允许在保存时自动领取。
  */
 router.put('/:id/save-draft', body(saveDraftSchema), annotationSubmitLimiter, (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -641,16 +636,16 @@ router.put('/:id/save-draft', body(saveDraftSchema), annotationSubmitLimiter, (r
     return res.notFound('Annotation item not found');
   }
 
-  // RBAC: only annotator
+  // 仅标注员可以保存草稿。
   if (req.currentUser.role !== 'annotator') {
     return res.fail('Only annotators can save drafts', 403);
   }
-  // Annotator can save-draft if they own the item OR if the item is unassigned (auto-claim)
+  // 可以操作自己的项，也可以自动领取未分配项。
   if (item.annotator !== null && !isAnnotatorOwner(item, req.currentUser)) {
     return res.fail('Annotators can only operate on their own data', 403);
   }
 
-  // Validate status transition: current -> draft
+  // 校验当前状态是否允许进入 draft。
   const { valid, reason } = validateTransition(
     DATA_ITEM_TRANSITIONS,
     item.status,
@@ -685,7 +680,7 @@ router.put('/:id/save-draft', body(saveDraftSchema), annotationSubmitLimiter, (r
     timestamp: now,
   };
 
-  // Optimistic lock: check version
+  // 校验版本号，避免覆盖他人的最新修改。
   const clientVersion = req.body.version;
   if (clientVersion !== undefined && clientVersion !== null && item.version !== clientVersion) {
     return res.fail(
@@ -706,24 +701,20 @@ router.put('/:id/save-draft', body(saveDraftSchema), annotationSubmitLimiter, (r
 });
 
 /**
- * Run server-side AI review, persist its result, and advance item status.
- * Reused by submit, resubmit, and POST ai-review.
- *
- * @param {Object} item - Submitted annotation item.
- * @returns {{ reviewRecord: Object, updatedItem: Object } | null} AI result, or null when template data is missing.
+ * 执行服务端规则预审、保存结果并推进状态，供提交和重提流程复用。
  */
 function executeAndPersistAIReview(item) {
-  // 1. Load the related template.
+  // 读取关联模板。
   const task = db.getById('tasks', item.taskId);
   const templateId = task?.templateId;
   const template = templateId ? db.getById('templates', templateId) : null;
 
   if (!template || !template.fields || template.fields.length === 0) {
-    // Skip AI review when the template is missing or has no fields.
+    // 模板缺失或没有字段时跳过预审。
     return null;
   }
 
-  // 2. Run the AI review engine on the server.
+  // 在服务端执行规则引擎，避免客户端篡改预审结果。
   const aiResult = runAIReview({
     template,
     rawData: item.rawData || {},
@@ -733,7 +724,7 @@ function executeAndPersistAIReview(item) {
     templateId: templateId,
   });
 
-  // 3. Persist the AI review result.
+  // 保存预审结果。
   const now = new Date().toISOString();
   const reviewRecord = {
     id: aiResult.id,
@@ -751,31 +742,22 @@ function executeAndPersistAIReview(item) {
   };
   db.insert('reviews', reviewRecord);
 
-  // 4. Advance item status: submitted -> ai_reviewing -> ai_reviewed -> pending_review.
+  // 规则预审同步完成，submitted 直接进入待人工审核。
   const historyRecords = [
     {
       id: `h${Date.now()}a`,
-      operator: 'AI System',
-      actionType: 'ai_review_start',
+      operator: 'Rule Engine',
+      actionType: 'ai_review_complete',
       fromStatus: item.status,
-      toStatus: 'ai_reviewing',
+      toStatus: 'pending_review',
       reason: null,
       timestamp: now,
     },
     {
       id: `h${Date.now()}b`,
-      operator: 'AI System',
-      actionType: 'ai_review_complete',
-      fromStatus: 'ai_reviewing',
-      toStatus: 'ai_reviewed',
-      reason: null,
-      timestamp: now,
-    },
-    {
-      id: `h${Date.now()}c`,
       operator: 'System',
       actionType: 'assign_reviewer',
-      fromStatus: 'ai_reviewed',
+      fromStatus: 'pending_review',
       toStatus: 'pending_review',
       reason: null,
       timestamp: now,
@@ -792,15 +774,8 @@ function executeAndPersistAIReview(item) {
 
 /**
  * PUT /annotation-items/:id/submit
- * Body: { annotationData }
- * Submit annotation, trigger server-side AI review, and advance to pending_review.
- * RBAC: annotator (own items only) + owner
- *
- * Flow:
- * 1. Save annotation data and set status to submitted.
- * 2. Run AI review on the server.
- * 3. Persist the review and advance status to pending_review.
- * 4. Return the updated item and AI review result.
+ * 请求体：{ annotationData }
+ * 提交标注，触发服务端规则预审，并推进到 pending_review。
  */
 router.put('/:id/submit', body(submitAnnotationSchema), annotationSubmitLimiter, (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -808,7 +783,7 @@ router.put('/:id/submit', body(submitAnnotationSchema), annotationSubmitLimiter,
     return res.notFound('Annotation item not found');
   }
 
-  // Validate input: annotationData
+  // 校验标注数据。
   if (
     req.body.annotationData !== undefined &&
     req.body.annotationData !== null &&
@@ -817,16 +792,16 @@ router.put('/:id/submit', body(submitAnnotationSchema), annotationSubmitLimiter,
     return res.fail('annotationData must be an object');
   }
 
-  // RBAC: only annotator
+  // 仅标注员可以提交。
   if (req.currentUser.role !== 'annotator') {
     return res.fail('Only annotators can submit annotations', 403);
   }
-  // Annotator can submit if they own the item OR if the item is unassigned (auto-claim)
+  // 可以提交自己的项，或在提交时自动领取未分配项。
   if (item.annotator !== null && !isAnnotatorOwner(item, req.currentUser)) {
     return res.fail('Annotators can only operate on their own data', 403);
   }
 
-  // Validate status transition: current -> submitted
+  // 校验当前状态是否允许提交。
   const { valid, reason } = validateTransition(
     DATA_ITEM_TRANSITIONS,
     item.status,
@@ -862,7 +837,7 @@ router.put('/:id/submit', body(submitAnnotationSchema), annotationSubmitLimiter,
     timestamp: now,
   };
 
-  // Optimistic lock: check version
+  // 校验版本号，避免并发提交覆盖结果。
   const clientVersion = req.body.version;
   if (clientVersion !== undefined && clientVersion !== null && item.version !== clientVersion) {
     return res.fail(
@@ -872,7 +847,7 @@ router.put('/:id/submit', body(submitAnnotationSchema), annotationSubmitLimiter,
     );
   }
 
-  // Step 1: submit annotation and set status to submitted.
+  // 第一步：保存标注并进入 submitted。
   const submittedItem = db.updateById('annotation-items', item.id, {
     status: 'submitted',
     annotationData,
@@ -881,14 +856,14 @@ router.put('/:id/submit', body(submitAnnotationSchema), annotationSubmitLimiter,
     auditHistory: [...(item.auditHistory || []), historyRecord],
   });
 
-  // Step 2: trigger server-side AI review.
+  // 第二步：执行服务端规则预审。
   const aiResult = executeAndPersistAIReview(submittedItem);
 
-  // Notify reviewers that an annotation was submitted.
+  // 通知可处理该项的审核员。
   notifyAnnotationSubmitted(submittedItem, req.currentUser);
 
   if (aiResult) {
-    // Notify reviewers that AI review completed.
+    // 预审完成后补发带结果的通知。
     notifyAIReviewComplete(aiResult.updatedItem, aiResult.reviewRecord);
 
     res.success(
@@ -896,22 +871,21 @@ router.put('/:id/submit', body(submitAnnotationSchema), annotationSubmitLimiter,
         item: aiResult.updatedItem,
         review: aiResult.reviewRecord,
       },
-      'Annotation submitted and AI review completed',
+      'Annotation submitted and rule review completed',
     );
   } else {
-    // Keep submitted status when AI review is skipped because the template is missing.
+    // 模板缺失时保留 submitted，等待后续人工处理。
     res.success(
       submittedItem,
-      'Annotation submitted; AI review skipped because template was not found',
+      'Annotation submitted; rule review skipped because template was not found',
     );
   }
 });
 
 /**
  * PUT /annotation-items/:id/approve
- * Body: { reason? }
- * Approve annotation and set status to 'reviewed'.
- * RBAC: reviewer (not own annotation) + owner
+ * 请求体：{ reason? }
+ * 审核通过并将状态设为 reviewed。
  */
 router.put('/:id/approve', body(approveSchema), reviewActionLimiter, (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -919,7 +893,7 @@ router.put('/:id/approve', body(approveSchema), reviewActionLimiter, (req, res) 
     return res.notFound('Annotation item not found');
   }
 
-  // Validate input: reason (optional)
+  // 理由可选，仅做长度和类型校验。
   if (req.body.reason !== undefined && req.body.reason !== null) {
     const reasonResult = readString(req.body, 'reason', { maxLength: 1000 });
     if (reasonResult.error) {
@@ -927,7 +901,7 @@ router.put('/:id/approve', body(approveSchema), reviewActionLimiter, (req, res) 
     }
   }
 
-  // RBAC: only reviewer, with avoidance principle
+  // 仅审核员可以操作，且不能审核自己的标注。
   if (!canReviewerApprove(item, req.currentUser)) {
     if (req.currentUser.role === 'annotator') {
       return res.fail('Annotators cannot review annotations', 403);
@@ -935,11 +909,11 @@ router.put('/:id/approve', body(approveSchema), reviewActionLimiter, (req, res) 
     if (req.currentUser.role === 'owner') {
       return res.fail('Owners cannot review annotations', 403);
     }
-    // Reviewer trying to review their own annotation
+    // 拒绝自审。
     return res.fail('Reviewers cannot review their own annotations', 403);
   }
 
-  // Validate status transition: current -> reviewed
+  // 校验当前状态是否允许通过。
   const { valid, reason } = validateTransition(
     DATA_ITEM_TRANSITIONS,
     item.status,
@@ -994,7 +968,7 @@ router.put('/:id/approve', body(approveSchema), reviewActionLimiter, (req, res) 
     auditHistory: [...(item.auditHistory || []), ...historyRecords],
   });
 
-  // Notify the annotator that review was approved.
+  // 通知标注员审核结果。
   notifyReviewApproved(updated, req.currentUser);
 
   res.success(updated, 'Review approved and archived');
@@ -1002,9 +976,8 @@ router.put('/:id/approve', body(approveSchema), reviewActionLimiter, (req, res) 
 
 /**
  * PUT /annotation-items/:id/reject
- * Body: { reason }
- * Reject annotation and set status to 'rejected'.
- * RBAC: reviewer (not own annotation) + owner
+ * 请求体：{ reason }
+ * 审核驳回并将状态设为 rejected。
  */
 router.put('/:id/reject', body(rejectSchema), reviewActionLimiter, (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -1012,7 +985,7 @@ router.put('/:id/reject', body(rejectSchema), reviewActionLimiter, (req, res) =>
     return res.notFound('Annotation item not found');
   }
 
-  // Validate input: reason (required)
+  // 驳回理由必填。
   const reasonResult = readString(req.body, 'reason', {
     required: true,
     minLength: 1,
@@ -1022,7 +995,7 @@ router.put('/:id/reject', body(rejectSchema), reviewActionLimiter, (req, res) =>
     return res.fail(reasonResult.error);
   }
 
-  // RBAC: only reviewer, with avoidance principle
+  // 仅审核员可以操作，且不能审核自己的标注。
   if (!canReviewerApprove(item, req.currentUser)) {
     if (req.currentUser.role === 'annotator') {
       return res.fail('Annotators cannot review annotations', 403);
@@ -1030,11 +1003,11 @@ router.put('/:id/reject', body(rejectSchema), reviewActionLimiter, (req, res) =>
     if (req.currentUser.role === 'owner') {
       return res.fail('Owners cannot review annotations', 403);
     }
-    // Reviewer trying to review their own annotation
+    // 拒绝自审。
     return res.fail('Reviewers cannot review their own annotations', 403);
   }
 
-  // Validate status transition: current -> rejected
+  // 校验当前状态是否允许驳回。
   const { valid, reason } = validateTransition(
     DATA_ITEM_TRANSITIONS,
     item.status,
@@ -1079,7 +1052,7 @@ router.put('/:id/reject', body(rejectSchema), reviewActionLimiter, (req, res) =>
     auditHistory: [...(item.auditHistory || []), historyRecord],
   });
 
-  // Notify the annotator that review was rejected.
+  // 通知标注员修改并重新提交。
   notifyReviewRejected(updated, req.currentUser);
 
   res.success(updated, 'Annotation rejected');
@@ -1087,11 +1060,8 @@ router.put('/:id/reject', body(rejectSchema), reviewActionLimiter, (req, res) =>
 
 /**
  * PUT /annotation-items/:id/resubmit
- * Body: { annotationData }
- * Resubmit after rejection, trigger AI review, and advance to pending_review.
- * RBAC: annotator (own items only) + owner
- *
- * Same flow as submit: AI review runs automatically on the server.
+ * 请求体：{ annotationData }
+ * 驳回后重新提交，流程与首次提交相同并自动执行服务端规则预审。
  */
 router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -1099,7 +1069,7 @@ router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
     return res.notFound('Annotation item not found');
   }
 
-  // Validate input: annotationData
+  // 校验重新提交的标注数据。
   if (
     req.body.annotationData !== undefined &&
     req.body.annotationData !== null &&
@@ -1108,7 +1078,7 @@ router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
     return res.fail('annotationData must be an object');
   }
 
-  // RBAC: only annotator, and must own the item
+  // 仅原标注员可以重新提交自己的项。
   if (req.currentUser.role !== 'annotator') {
     return res.fail('Only annotators can resubmit annotations', 403);
   }
@@ -1116,7 +1086,7 @@ router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
     return res.fail('Annotators can only operate on their own data', 403);
   }
 
-  // Validate status transition: current -> submitted (resubmission)
+  // 校验驳回项是否允许重新提交。
   const { valid, reason } = validateTransition(
     DATA_ITEM_TRANSITIONS,
     item.status,
@@ -1152,7 +1122,7 @@ router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
     timestamp: now,
   };
 
-  // Optimistic lock: check version
+  // 校验版本号，避免并发修改互相覆盖。
   const clientVersion = req.body.version;
   if (clientVersion !== undefined && clientVersion !== null && item.version !== clientVersion) {
     return res.fail(
@@ -1162,7 +1132,7 @@ router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
     );
   }
 
-  // Step 1: resubmit and set status to submitted.
+  // 第一步：保存修改并进入 submitted。
   const submittedItem = db.updateById('annotation-items', item.id, {
     status: 'submitted',
     annotationData,
@@ -1171,14 +1141,14 @@ router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
     auditHistory: [...(item.auditHistory || []), historyRecord],
   });
 
-  // Step 2: trigger server-side AI review.
+  // 第二步：重新执行服务端规则预审。
   const aiResult = executeAndPersistAIReview(submittedItem);
 
-  // Notify reviewers that an annotation was resubmitted.
+  // 通知审核员重新提交。
   notifyAnnotationResubmitted(submittedItem, req.currentUser);
 
   if (aiResult) {
-    // Notify reviewers that AI review completed.
+    // 预审完成后补发结果通知。
     notifyAIReviewComplete(aiResult.updatedItem, aiResult.reviewRecord);
 
     res.success(
@@ -1186,21 +1156,19 @@ router.put('/:id/resubmit', annotationSubmitLimiter, (req, res) => {
         item: aiResult.updatedItem,
         review: aiResult.reviewRecord,
       },
-      'Annotation resubmitted and AI review completed',
+      'Annotation resubmitted and rule review completed',
     );
   } else {
     res.success(
       submittedItem,
-      'Annotation resubmitted; AI review skipped because template was not found',
+      'Annotation resubmitted; rule review skipped because template was not found',
     );
   }
 });
 
 /**
  * PUT /annotation-items/:id/claim-assignment
- * Annotator claims one unassigned annotation item.
- * Sets item.annotator to the current user while preserving item status.
- * RBAC: annotator + owner
+ * 标注员领取一个未分配项，只设置归属，不改变当前状态。
  */
 router.put('/:id/claim-assignment', (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -1208,12 +1176,12 @@ router.put('/:id/claim-assignment', (req, res) => {
     return res.notFound('Annotation item not found');
   }
 
-  // RBAC: only annotator can claim assignment
+  // 仅标注员可以领取。
   if (req.currentUser.role !== 'annotator') {
     return res.fail('Only annotators can claim annotation items', 403);
   }
 
-  // Already assigned items cannot be claimed again.
+  // 已分配项不能重复领取。
   if (item.annotator !== null) {
     return res.fail('Annotation item has already been assigned', 403);
   }
@@ -1226,12 +1194,12 @@ router.put('/:id/claim-assignment', (req, res) => {
     return res.fail('Current status cannot be claimed for annotation', 403);
   }
 
-  // Archived items cannot be claimed.
+  // 归档项不能领取。
   if (item.archived) {
     return res.fail('Archived annotation items cannot be claimed', 403);
   }
 
-  // Items from tasks that are not open cannot be claimed.
+  // 非开放任务中的项不能领取。
   const task = db.getById('tasks', item.taskId);
   if (!canTaskExposeWorkItems(task)) {
     return res.fail('Task is not open for annotation', 403);
@@ -1276,7 +1244,7 @@ router.put('/:id/claim-review', (req, res) => {
     return res.fail('Review item is overdue and cannot be claimed', 403);
   }
 
-  if (!['submitted', 'ai_reviewed', 'pending_review'].includes(item.status)) {
+  if (!['submitted', 'pending_review'].includes(item.status)) {
     return res.fail('Current status cannot be claimed for review', 403);
   }
 
@@ -1312,9 +1280,7 @@ router.put('/:id/claim-review', (req, res) => {
 
 /**
  * PUT /annotation-items/:id/claim
- * Claim (pessimistic lock) an annotation item for editing.
- * Only one user can hold the lock at a time; locks auto-expire after 30 minutes.
- * RBAC: annotator (own items) + owner
+ * 为编辑领取标注项的排他锁，同一时间只能由一个用户持有，30 分钟后自动过期。
  */
 router.put('/:id/claim', (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -1322,7 +1288,7 @@ router.put('/:id/claim', (req, res) => {
     return res.notFound('Annotation item not found');
   }
 
-  // RBAC: only annotator can claim (owner cannot annotate)
+  // 只有标注员可以加编辑锁，负责人不能直接标注。
   if (req.currentUser.role !== 'annotator') {
     return res.fail('Only annotators can lock annotation items', 403);
   }
@@ -1348,8 +1314,7 @@ router.put('/:id/claim', (req, res) => {
 
 /**
  * PUT /annotation-items/:id/release
- * Release (unlock) an annotation item.
- * RBAC: the lock holder + owner can release
+ * 释放标注项的编辑锁，锁持有者或负责人可以操作。
  */
 router.put('/:id/release', (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -1358,7 +1323,7 @@ router.put('/:id/release', (req, res) => {
   }
 
   const username = req.currentUser.username;
-  // Owner can force-release any lock (admin operation), annotator can only release own locks
+  // 负责人可以强制释放，标注员只能释放自己的锁。
   if (req.currentUser.role === 'annotator' && item.lockedBy && item.lockedBy !== username) {
     return res.fail('Annotators can only release their own annotation locks', 403);
   }
@@ -1378,8 +1343,7 @@ router.put('/:id/release', (req, res) => {
 
 /**
  * POST /annotation-items/release-all
- * Release all locks held by the current user (useful on logout).
- * RBAC: any authenticated user (can only release their own locks)
+ * 释放当前用户持有的全部锁，适合退出登录时调用。
  */
 router.post('/release-all', (req, res) => {
   const username = req.currentUser.username;
@@ -1389,8 +1353,7 @@ router.post('/release-all', (req, res) => {
 
 /**
  * POST /annotation-items/:id/ai-review
- * Manually trigger AI review for an annotation item that is in 'submitted' status.
- * RBAC: owner only (manual trigger is an admin operation)
+ * 手动触发 submitted 状态标注项的规则预审，仅负责人可操作。
  */
 router.post('/:id/ai-review', requireRole('owner'), (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -1398,7 +1361,7 @@ router.post('/:id/ai-review', requireRole('owner'), (req, res) => {
     return res.notFound('Annotation item not found');
   }
 
-  // Only submitted items can be AI-reviewed
+  // 只有 submitted 状态可以手动预审。
   if (item.status !== 'submitted') {
     return res.fail(
       `Only submitted annotation items can be AI-reviewed; current status: ${item.status}`,
@@ -1408,7 +1371,7 @@ router.post('/:id/ai-review', requireRole('owner'), (req, res) => {
   const aiResult = executeAndPersistAIReview(item);
 
   if (aiResult) {
-    // Notify reviewers that AI review completed.
+    // 通知审核员预审已完成。
     notifyAIReviewComplete(aiResult.updatedItem, aiResult.reviewRecord);
 
     res.success(
@@ -1416,18 +1379,16 @@ router.post('/:id/ai-review', requireRole('owner'), (req, res) => {
         item: aiResult.updatedItem,
         review: aiResult.reviewRecord,
       },
-      'AI review completed',
+      'Rule review completed',
     );
   } else {
-    res.fail('AI review skipped: related template was not found or has no fields');
+    res.fail('Rule review skipped: related template was not found or has no fields');
   }
 });
 
 /**
  * PUT /annotation-items/:id/archive
- * Archive an annotation item (mark as archived).
- * Only reviewed (approved) items can be archived.
- * RBAC: owner + reviewer can archive
+ * 归档已审核通过的标注项，仅负责人或审核员可操作。
  */
 router.put('/:id/archive', (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
@@ -1435,12 +1396,12 @@ router.put('/:id/archive', (req, res) => {
     return res.notFound('Annotation item not found');
   }
 
-  // RBAC: only owner or reviewer can archive
+  // 仅负责人或审核员可以归档。
   if (req.currentUser.role !== 'owner' && req.currentUser.role !== 'reviewer') {
     return res.fail('Annotators cannot archive annotation items', 403);
   }
 
-  // Only reviewed items can be archived
+  // 只有审核通过的项可以归档。
   if (item.status !== 'reviewed') {
     return res.fail('Only approved annotation items can be archived');
   }
@@ -1471,8 +1432,7 @@ router.put('/:id/archive', (req, res) => {
 
 /**
  * PUT /annotation-items/:id/unarchive
- * Unarchive an annotation item (remove from archive).
- * RBAC: owner only
+ * 取消标注项归档，仅负责人可操作。
  */
 router.put('/:id/unarchive', requireRole('owner'), (req, res) => {
   const item = db.getById('annotation-items', req.params.id);
